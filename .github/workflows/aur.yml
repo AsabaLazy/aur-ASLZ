@@ -1,0 +1,123 @@
+name: AUR Package & Publish
+
+on:
+  schedule:
+    # 每 6 小时自动检测上游是否发布新版本
+    - cron: "0 */6 * * *"
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (例如 v0.2.10，留空则自动检测上游最新版)"
+        required: false
+        default: ""
+
+jobs:
+  aur:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract version and checksum (astrlink-bin)
+        id: meta
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          UPSTREAM="Calcium-Ion/AstrLink"
+          TAG="${{ github.event.inputs.tag || github.event.release.tag_name }}"
+
+          if [ -z "$TAG" ]; then
+            UPSTREAM_TAG=$(curl -sL "https://api.github.com/repos/${UPSTREAM}/releases/latest" | jq -r .tag_name)
+            if [ -z "$UPSTREAM_TAG" ] || [ "$UPSTREAM_TAG" = "null" ]; then
+              echo "Error: Failed to fetch upstream latest release" >&2
+              exit 1
+            fi
+
+            ASSET_EXISTS=$(gh release view "$UPSTREAM_TAG" --repo "${{ github.repository }}" --json assets -q '.assets[] | select(.name | endswith(".pkg.tar.zst")) | .name' 2>/dev/null || true)
+            if [ -n "$ASSET_EXISTS" ]; then
+              echo "Already packaged and published for $UPSTREAM_TAG. Skipping."
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            TAG="$UPSTREAM_TAG"
+          fi
+
+          VERSION="${TAG#v}"
+          DEB_FILE="AstrLink_${VERSION}_amd64.deb"
+          SUMS_URL="https://github.com/${{ github.repository }}/releases/download/${TAG}/SHA256SUMS"
+          SHA256=$(curl -sL "$SUMS_URL" | grep "$DEB_FILE" | awk '{print $1}')
+          if [ -z "$SHA256" ]; then
+            SUMS_URL="https://github.com/${UPSTREAM}/releases/download/${TAG}/SHA256SUMS"
+            SHA256=$(curl -sL "$SUMS_URL" | grep "$DEB_FILE" | awk '{print $1}')
+          fi
+
+          if [ -z "$SHA256" ]; then
+            echo "Error: Could not find checksum for $DEB_FILE" >&2
+            exit 1
+          fi
+
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "sha256=$SHA256" >> "$GITHUB_OUTPUT"
+
+      - name: Update PKGBUILD (astrlink-bin)
+        if: steps.meta.outputs.skip != 'true'
+        run: |
+          sed -i "s/^pkgver=.*/pkgver=${{ steps.meta.outputs.version }}/" packages/astrlink-bin/PKGBUILD
+          sed -i "s/^pkgrel=.*/pkgrel=1/" packages/astrlink-bin/PKGBUILD
+          sed -i "s/sha256sums_x86_64=.*/sha256sums_x86_64=('${{ steps.meta.outputs.sha256 }}')/" packages/astrlink-bin/PKGBUILD
+
+      - name: Compile packages in packages/ and update repo database
+        if: steps.meta.outputs.skip != 'true'
+        run: |
+          docker run --rm \
+            -v "$PWD/packages:/packages" \
+            -w /packages \
+            archlinux:base-devel bash -c '
+              useradd -m builder && chown -R builder .
+              mkdir -p repo
+              for pkg_dir in */ ; do
+                if [ -f "${pkg_dir}PKGBUILD" ] && [ "${pkg_dir}" != "repo/" ]; then
+                  echo "Building package in ${pkg_dir}..."
+                  (cd "$pkg_dir" && su builder -c "makepkg --printsrcinfo > .SRCINFO" && su builder -c "makepkg -s -d --noconfirm")
+                  cp ${pkg_dir}*.pkg.tar.zst repo/ 2>/dev/null || true
+                fi
+              done
+              cd repo
+              repo-add astrlink.db.tar.gz *.pkg.tar.zst
+            '
+
+      - name: Upload .pkg.tar.zst to Release
+        if: steps.meta.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${{ steps.meta.outputs.tag }}"
+          gh release view "$TAG" --repo "${{ github.repository }}" >/dev/null 2>&1 || \
+            gh release create "$TAG" --repo "${{ github.repository }}" --title "$TAG" --notes "Automated Arch Linux package release for upstream $TAG"
+          gh release upload "$TAG" --repo "${{ github.repository }}" packages/astrlink-bin/*.pkg.tar.zst --clobber
+
+      - name: Deploy Pacman repository to GitHub Pages
+        if: steps.meta.outputs.skip != 'true'
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: packages/repo
+          force_orphan: true
+
+      - name: Publish to AUR
+        if: env.AUR_KEY != '' && steps.meta.outputs.skip != 'true'
+        env:
+          AUR_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+        uses: KSXGitHub/github-actions-deploy-aur@v3
+        with:
+          pkgname: astrlink-bin
+          pkgbuild: packages/astrlink-bin/PKGBUILD
+          commit_username: "github-actions[bot]"
+          commit_email: "github-actions[bot]@users.noreply.github.com"
+          ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+          commit_message: "Update to ${{ steps.meta.outputs.version }}"
