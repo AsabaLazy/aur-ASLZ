@@ -39,6 +39,7 @@ sudo pacman -Sy
 | [`gopeed-bin`](https://github.com/GopeedLab/gopeed) | `sudo pacman -S gopeed-bin` | High speed downloader that supports all platforms |
 | [`novelmikuer-bin`](https://github.com/AsabaLazy/NovelMikuer) | `sudo pacman -S novelmikuer-bin` | Batch replace and clean novel text (compatible with Legado 3.0) |
 | [`antigravity-cli-bin`](https://github.com/google-antigravity/antigravity-cli) | `sudo pacman -S antigravity-cli-bin` | Google's agentic development platform (CLI companion) |
+| [`dimagent-bin`](https://dimagent.cn) | `sudo pacman -S dimagent-bin` | DimAgent desktop client — AI coding agent |
 
 ## Q&A
 

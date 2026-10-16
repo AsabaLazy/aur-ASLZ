@@ -33,6 +33,11 @@ PACKAGES = [
         "upstream": "google-antigravity/antigravity-cli",
         "asset_pattern": r"^agy_cli_linux_x64\.tar\.gz$",
     },
+    {
+        "name": "dimagent-bin",
+        "manifest_url": "https://dimcode.echooai.com/updates/stable/linux/x64/latest-linux.yml",
+        "download_url_template": "https://dimcode.echooai.com/updates/stable/linux/x64/DimAgent-{version}.deb",
+    },
 ]
 
 def make_headers():
@@ -63,6 +68,24 @@ def get_asset_sha256(upstream, tag, asset_name, download_url):
             hasher.update(chunk)
     return hasher.hexdigest()
 
+def update_pkgbuild(name, version, sha256, download_url):
+    pkgbuild_path = f"packages/{name}/PKGBUILD"
+    if not os.path.exists(pkgbuild_path):
+        print(f"  Error: {pkgbuild_path} does not exist", file=sys.stderr)
+        return False
+
+    with open(pkgbuild_path, "r") as f:
+        content = f.read()
+
+    content = re.sub(r"^pkgver=.*", f"pkgver={version}", content, flags=re.MULTILINE)
+    content = re.sub(r"^pkgrel=.*", "pkgrel=1", content, flags=re.MULTILINE)
+    content = re.sub(r"(sha256sums_x86_64=\(')[0-9a-fA-F]+", rf"\g<1>{sha256}", content)
+    content = re.sub(r'::https://[^"]+', rf'::{download_url}', content)
+
+    with open(pkgbuild_path, "w") as f:
+        f.write(content)
+    return True
+
 def main():
     repo = os.environ.get("GITHUB_REPOSITORY", "AsabaLazy/aur-ASLZ")
     force = os.environ.get("FORCE_BUILD", "false").lower() == "true"
@@ -70,6 +93,56 @@ def main():
 
     for pkg in PACKAGES:
         name = pkg["name"]
+
+        # 处理基于独立 YAML / JSON Manifest 的软件包
+        if "manifest_url" in pkg:
+            print(f"Checking {name} (manifest: {pkg['manifest_url']})...")
+            try:
+                req = urllib.request.Request(pkg["manifest_url"], headers=make_headers())
+                manifest_text = urllib.request.urlopen(req).read().decode()
+                m = re.search(r"^version:\s*(.+)", manifest_text, re.MULTILINE)
+                if not m:
+                    print(f"  Error: version not found in manifest for {name}", file=sys.stderr)
+                    continue
+                version = m.group(1).strip()
+            except Exception as e:
+                print(f"  Error fetching manifest for {name}: {e}", file=sys.stderr)
+                continue
+
+            download_url = pkg["download_url_template"].format(version=version)
+
+            if repo and not force:
+                res = subprocess.run(
+                    [
+                        "gh", "release", "view", name, "--repo", repo,
+                        "--json", "assets", "-q",
+                        f'.assets[] | select(.name | startswith("{name}-{version}-")) | .name',
+                    ],
+                    capture_output=True,
+                    text=True,
+                )
+                if res.stdout.strip():
+                    print(f"  [OK] {name} is up-to-date with {version}.")
+                    continue
+
+            print(f"  [UPDATE] {name} needs build for {version}.")
+            print(f"  Streaming {download_url} to calculate sha256...")
+            try:
+                req = urllib.request.Request(download_url, headers=make_headers())
+                hasher = hashlib.sha256()
+                with urllib.request.urlopen(req) as resp:
+                    while chunk := resp.read(65536):
+                        hasher.update(chunk)
+                sha256 = hasher.hexdigest()
+            except Exception as e:
+                print(f"  Error calculating checksum for {download_url}: {e}", file=sys.stderr)
+                continue
+
+            if update_pkgbuild(name, version, sha256, download_url):
+                updated_packages.append(name)
+            continue
+
+        # 处理基于 GitHub Releases 的软件包
         upstream = pkg["upstream"]
         print(f"Checking {name} (upstream: {upstream})...")
 
@@ -129,28 +202,8 @@ def main():
             print(f"  Error: sha256 for {asset_name} could not be determined", file=sys.stderr)
             continue
 
-        # 更新 PKGBUILD
-        pkgbuild_path = f"packages/{name}/PKGBUILD"
-        if not os.path.exists(pkgbuild_path):
-            print(f"  Error: {pkgbuild_path} does not exist", file=sys.stderr)
-            continue
-
-        with open(pkgbuild_path, "r") as f:
-            content = f.read()
-
-        content = re.sub(r"^pkgver=.*", f"pkgver={version}", content, flags=re.MULTILINE)
-        content = re.sub(r"^pkgrel=.*", "pkgrel=1", content, flags=re.MULTILINE)
-        content = re.sub(r"(sha256sums_x86_64=\(')[0-9a-fA-F]+", rf"\g<1>{sha256}", content)
-        content = re.sub(
-            r'::https://github\.com/[^/]+/[^/]+/releases/download/[^/]+/[^"]+',
-            rf'::{download_url}',
-            content,
-        )
-
-        with open(pkgbuild_path, "w") as f:
-            f.write(content)
-
-        updated_packages.append(name)
+        if update_pkgbuild(name, version, sha256, download_url):
+            updated_packages.append(name)
 
     skip = len(updated_packages) == 0 and not force
     print(f"\nSummary: {len(updated_packages)} package(s) updated. Skip build: {skip}")

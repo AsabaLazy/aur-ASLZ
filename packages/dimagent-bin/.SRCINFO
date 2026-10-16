@@ -1,0 +1,27 @@
+pkgbase = dimagent-bin
+	pkgdesc = DimAgent desktop client — AI coding agent
+	pkgver = 0.9.55
+	pkgrel = 1
+	url = https://dimagent.cn
+	arch = x86_64
+	license = LicenseRef-DimAgent-EULA
+	depends = gtk3
+	depends = nss
+	depends = alsa-lib
+	depends = libcups
+	depends = libxtst
+	depends = libxss
+	depends = libsecret
+	depends = libnotify
+	depends = at-spi2-core
+	depends = mesa
+	depends = xdg-utils
+	optdepends = libappindicator-gtk3: tray icon on desktops without StatusNotifier
+	provides = dimagent
+	conflicts = dimagent
+	options = !debug
+	options = !strip
+	source_x86_64 = dimagent-bin-0.9.55.deb::https://dimcode.echooai.com/updates/stable/linux/x64/DimAgent-0.9.55.deb
+	sha256sums_x86_64 = 64fbc98e27010356c24c7f730ce158091d6416165203be2a2e58205f919408e9
+
+pkgname = dimagent-bin
