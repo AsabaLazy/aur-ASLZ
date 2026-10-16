@@ -1,0 +1,11 @@
+# Makepkg and pacman build artifacts
+src/
+pkg/
+*.pkg.tar.*
+*.deb
+*.tar.*
+packages/repo/
+packages/*/*.deb
+packages/*/*.pkg.tar.*
+packages/*/magpie-*
+packages/*/AstrLink*

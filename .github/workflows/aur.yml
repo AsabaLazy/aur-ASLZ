@@ -1,0 +1,91 @@
+name: AUR Package & Publish
+
+on:
+  schedule:
+    # 每天 04:00 UTC (北京时间 12:00) 自动同步上游最新版本
+    - cron: "0 4 * * *"
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "强制重新构建所有包 (true/false)"
+        required: false
+        default: "false"
+
+jobs:
+  aur:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check upstream releases and update PKGBUILDs
+        id: meta
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FORCE_BUILD: ${{ github.event.inputs.force || 'false' }}
+        run: |
+          python3 .github/scripts/sync-packages.py
+
+      - name: Compile packages in packages/ and update repo database
+        if: steps.meta.outputs.skip != 'true'
+        run: |
+          docker run --rm \
+            -v "$PWD/packages:/packages" \
+            -w /packages \
+            archlinux:base-devel bash -c '
+              useradd -m builder && chown -R builder .
+              mkdir -p repo
+              for pkg_dir in */ ; do
+                if [ -f "${pkg_dir}PKGBUILD" ] && [ "${pkg_dir}" != "repo/" ]; then
+                  echo "Building package in ${pkg_dir}..."
+                  (cd "$pkg_dir" && su builder -c "makepkg --printsrcinfo > .SRCINFO" && su builder -c "makepkg -s -d --noconfirm")
+                  cp ${pkg_dir}*.pkg.tar.zst repo/ 2>/dev/null || true
+                fi
+              done
+              cd repo
+              repo-add astrlink.db.tar.gz *.pkg.tar.zst
+            '
+
+      - name: Upload .pkg.tar.zst to Release
+        if: steps.meta.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for pkg_dir in packages/*/; do
+            if [ -f "${pkg_dir}PKGBUILD" ] && compgen -G "${pkg_dir}*.pkg.tar.zst" > /dev/null; then
+              pkg_name=$(basename "$pkg_dir")
+              pkg_ver=$(grep -oP '^pkgver=\K.*' "${pkg_dir}PKGBUILD")
+              gh release view "$pkg_name" --repo "${{ github.repository }}" >/dev/null 2>&1 || \
+                gh release create "$pkg_name" --repo "${{ github.repository }}" --title "$pkg_name" --notes "Precompiled Arch Linux package for $pkg_name"
+
+              OLD_ASSETS=$(gh release view "$pkg_name" --repo "${{ github.repository }}" --json assets -q '.assets[] | select(.name | endswith(".pkg.tar.zst")) | .name' 2>/dev/null || true)
+              for old in $OLD_ASSETS; do
+                gh release delete-asset "$pkg_name" "$old" --repo "${{ github.repository }}" -y || true
+              done
+
+              gh release edit "$pkg_name" --repo "${{ github.repository }}" --title "${pkg_name} v${pkg_ver}" --notes "Latest release: upstream v${pkg_ver}"
+              gh release upload "$pkg_name" --repo "${{ github.repository }}" ${pkg_dir}*.pkg.tar.zst --clobber
+            fi
+          done
+
+      - name: Deploy Pacman repository to GitHub Pages
+        if: steps.meta.outputs.skip != 'true'
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: packages/repo
+          force_orphan: true
+
+      - name: Commit updated package files to repository
+        if: steps.meta.outputs.skip != 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add packages/*/PKGBUILD packages/*/.SRCINFO
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: auto-update packages [skip ci]"
+            git push origin main
+          fi
