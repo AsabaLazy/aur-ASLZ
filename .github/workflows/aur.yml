@@ -4,8 +4,6 @@ on:
   schedule:
     # 每天 04:00 UTC (北京时间 12:00) 自动同步上游最新版本
     - cron: "0 4 * * *"
-  release:
-    types: [published]
   workflow_dispatch:
     inputs:
       force:

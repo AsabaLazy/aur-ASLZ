@@ -30,11 +30,18 @@ PACKAGES = [
     },
 ]
 
+def make_headers():
+    headers = {"User-Agent": "aur-monorepo-sync"}
+    token = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    return headers
+
 def get_asset_sha256(upstream, tag, asset_name, download_url):
     # 1. 尝试从上游发布的 SHA256SUMS 文件中匹配
     sums_url = f"https://github.com/{upstream}/releases/download/{tag}/SHA256SUMS"
     try:
-        req = urllib.request.Request(sums_url, headers={"User-Agent": "aur-monorepo-sync"})
+        req = urllib.request.Request(sums_url, headers=make_headers())
         sums_text = urllib.request.urlopen(req).read().decode()
         for line in sums_text.splitlines():
             if asset_name in line:
@@ -44,7 +51,7 @@ def get_asset_sha256(upstream, tag, asset_name, download_url):
 
     # 2. 回退：直接流式下载二进制计算 sha256
     print(f"  Streaming {download_url} to calculate sha256...")
-    req = urllib.request.Request(download_url, headers={"User-Agent": "aur-monorepo-sync"})
+    req = urllib.request.Request(download_url, headers=make_headers())
     hasher = hashlib.sha256()
     with urllib.request.urlopen(req) as resp:
         while chunk := resp.read(65536):
@@ -63,7 +70,7 @@ def main():
 
         req = urllib.request.Request(
             f"https://api.github.com/repos/{upstream}/releases/latest",
-            headers={"User-Agent": "aur-monorepo-sync"},
+            headers=make_headers(),
         )
         try:
             data = json.loads(urllib.request.urlopen(req).read())
