@@ -1,0 +1,43 @@
+# aur-ASLZ
+
+A collection of AUR packages maintained by ASLZ
+
+## 使用方法
+
+编辑 `/etc/pacman.conf`，在文件末尾添加：
+
+```ini
+[astrlink]
+SigLevel = Optional TrustAll
+Server = https://asabalazy.github.io/aur-ASLZ/
+```
+
+或者在终端中执行以下命令添加：
+
+```bash
+grep -q '^\[astrlink\]' /etc/pacman.conf || printf '\n[astrlink]\nSigLevel = Optional TrustAll\nServer = https://asabalazy.github.io/aur-ASLZ/\n' | sudo tee -a /etc/pacman.conf
+```
+
+更新软件包缓存：
+
+```bash
+sudo pacman -Sy
+```
+
+两次 `y`（`sudo pacman -Syy`）可强制刷新数据库缓存，避免从旧源切换时出现同步问题。
+
+## 软件包列表
+
+| 软件包 | 安装命令 | 说明 |
+| :--- | :--- | :--- |
+| [`astrlink-bin`](https://github.com/Calcium-Ion/AstrLink) | `sudo pacman -S astrlink-bin` | AI API Gateway & Desktop Client |
+| [`magpie-bin`](https://github.com/yetone/magpie) | `sudo pacman -S magpie-bin` | Every agent's model in one place (menu bar app) |
+| [`gopeed-bin`](https://github.com/GopeedLab/gopeed) | `sudo pacman -S gopeed-bin` | High speed downloader that supports all platforms |
+| [`novelmikuer-bin`](https://github.com/AsabaLazy/NovelMikuer) | `sudo pacman -S novelmikuer-bin` | Batch replace and clean novel text (compatible with Legado 3.0) |
+
+## Q&A
+
+**Q: 为什么不提交到官方 AUR 仓库？**
+
+A: 我不太喜欢那种需要被审核的感觉，尽管主要原因是在我提交aur时账户无法登陆，且他们的注册通道当时关闭了，就这么简单。
+
