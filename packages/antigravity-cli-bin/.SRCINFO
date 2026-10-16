@@ -1,0 +1,19 @@
+pkgbase = antigravity-cli-bin
+	pkgdesc = Google's agentic development platform (CLI companion)
+	pkgver = 1.4.0
+	pkgrel = 1
+	url = https://antigravity.google
+	arch = x86_64
+	license = custom:proprietary
+	depends = glibc
+	optdepends = antigravity: authenticate and share session state with desktop application
+	provides = antigravity-cli
+	provides = agy
+	conflicts = antigravity-cli
+	conflicts = agy
+	options = !debug
+	options = !strip
+	source_x86_64 = antigravity-cli-bin-1.4.0.tar.gz::https://github.com/google-antigravity/antigravity-cli/releases/download/1.4.0/agy_cli_linux_x64.tar.gz
+	sha256sums_x86_64 = fd96967583c1eed94733c039638fa59b71ddbd823c75ebc8dd0e677463565aad
+
+pkgname = antigravity-cli-bin

@@ -28,6 +28,11 @@ PACKAGES = [
         "upstream": "AsabaLazy/NovelMikuer",
         "asset_pattern": r"NovelMikuer_.*_amd64\.deb",
     },
+    {
+        "name": "antigravity-cli-bin",
+        "upstream": "google-antigravity/antigravity-cli",
+        "asset_pattern": r"^agy_cli_linux_x64\.tar\.gz$",
+    },
 ]
 
 def make_headers():
