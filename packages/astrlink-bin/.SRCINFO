@@ -1,0 +1,19 @@
+pkgbase = astrlink-bin
+	pkgdesc = AI API Gateway & Desktop Client
+	pkgver = 0.2.10
+	pkgrel = 1
+	url = https://github.com/Calcium-Ion/AstrLink
+	arch = x86_64
+	license = AGPL-3.0-only
+	depends = webkit2gtk-4.1
+	depends = libayatana-appindicator
+	depends = librsvg
+	depends = hicolor-icon-theme
+	provides = astrlink
+	conflicts = astrlink
+	options = !debug
+	options = !strip
+	source_x86_64 = https://github.com/Calcium-Ion/AstrLink/releases/download/v0.2.10/AstrLink_0.2.10_amd64.deb
+	sha256sums_x86_64 = 63dd77fe2ad265e419a54488f6dcd94a7215c75925ca85a3c41060e02edf4e0d
+
+pkgname = astrlink-bin
