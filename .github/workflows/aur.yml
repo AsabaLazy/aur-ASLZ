@@ -69,13 +69,18 @@ jobs:
             fi
           done
 
-      - name: Deploy Pacman repository to GitHub Pages
+      - name: Publish Pacman Repository to GitHub Releases
         if: steps.meta.outputs.skip != 'true'
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: packages/repo
-          force_orphan: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view repo --repo "${{ github.repository }}" >/dev/null 2>&1 || \
+            gh release create repo --repo "${{ github.repository }}" --title "Pacman Repository (x86_64)" --notes "Automated rolling binary repository for [astrlink]"
+
+          cd packages/repo
+          cp -L astrlink.db.tar.gz astrlink.db 2>/dev/null || true
+          cp -L astrlink.files.tar.gz astrlink.files 2>/dev/null || true
+          gh release upload repo * --repo "${{ github.repository }}" --clobber
 
       - name: Commit updated package files to repository
         if: steps.meta.outputs.skip != 'true'

@@ -13,13 +13,15 @@ A collection of AUR packages maintained by ASLZ.
 ```ini
 [astrlink]
 SigLevel = Optional TrustAll
-Server = https://asabalazy.github.io/aur-ASLZ/
+Server = https://github.com/AsabaLazy/aur-ASLZ/releases/download/repo
+# 国内免代理加速镜像（可选备用节点）：
+# Server = https://mirror.ghproxy.com/https://github.com/AsabaLazy/aur-ASLZ/releases/download/repo
 ```
 
 或者在终端中执行以下命令添加：
 
 ```bash
-grep -q '^\[astrlink\]' /etc/pacman.conf || printf '\n[astrlink]\nSigLevel = Optional TrustAll\nServer = https://asabalazy.github.io/aur-ASLZ/\n' | sudo tee -a /etc/pacman.conf
+grep -q '^\[astrlink\]' /etc/pacman.conf || printf '\n[astrlink]\nSigLevel = Optional TrustAll\nServer = https://github.com/AsabaLazy/aur-ASLZ/releases/download/repo\n' | sudo tee -a /etc/pacman.conf
 ```
 
 更新软件包缓存：
