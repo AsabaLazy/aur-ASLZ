@@ -114,7 +114,7 @@ def main():
             if repo and not force:
                 res = subprocess.run(
                     [
-                        "gh", "release", "view", name, "--repo", repo,
+                        "gh", "release", "view", "repo", "--repo", repo,
                         "--json", "assets", "-q",
                         f'.assets[] | select(.name | startswith("{name}-{version}-")) | .name',
                     ],
@@ -165,7 +165,7 @@ def main():
         if repo and not force:
             res = subprocess.run(
                 [
-                    "gh", "release", "view", name, "--repo", repo,
+                    "gh", "release", "view", "repo", "--repo", repo,
                     "--json", "assets", "-q",
                     f'.assets[] | select(.name | startswith("{name}-{version}-")) | .name',
                 ],
