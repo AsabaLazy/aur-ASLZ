@@ -80,6 +80,16 @@ jobs:
           cd packages/repo
           cp -L astrlink.db.tar.gz astrlink.db 2>/dev/null || true
           cp -L astrlink.files.tar.gz astrlink.files 2>/dev/null || true
+
+          # 自动清理已过期的旧版本包资产
+          EXISTING_ASSETS=$(gh release view repo --repo "${{ github.repository }}" --json assets -q '.assets[].name' 2>/dev/null || true)
+          for asset in $EXISTING_ASSETS; do
+            if [ ! -f "$asset" ]; then
+              echo "Deleting obsolete asset from repo release: $asset"
+              gh release delete-asset repo "$asset" --repo "${{ github.repository }}" -y || true
+            fi
+          done
+
           gh release upload repo * --repo "${{ github.repository }}" --clobber
 
       - name: Commit updated package files to repository
