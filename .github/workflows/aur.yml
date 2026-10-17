@@ -44,7 +44,7 @@ jobs:
                 fi
               done
               cd repo
-              repo-add astrlink.db.tar.gz *.pkg.tar.zst
+              repo-add aslz.db.tar.gz *.pkg.tar.zst
             '
 
       - name: Publish Pacman Repository to GitHub Releases
@@ -53,11 +53,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release view repo --repo "${{ github.repository }}" >/dev/null 2>&1 || \
-            gh release create repo --repo "${{ github.repository }}" --title "Pacman Repository (x86_64)" --notes "Automated rolling binary repository for [astrlink]"
+            gh release create repo --repo "${{ github.repository }}" --title "Pacman Repository (x86_64)" --notes "Automated rolling binary repository for [aslz]"
 
           cd packages/repo
-          cp -L astrlink.db.tar.gz astrlink.db 2>/dev/null || true
-          cp -L astrlink.files.tar.gz astrlink.files 2>/dev/null || true
+          cp -L aslz.db.tar.gz aslz.db 2>/dev/null || true
+          cp -L aslz.files.tar.gz aslz.files 2>/dev/null || true
 
           # 自动清理已过期的旧版本包资产
           EXISTING_ASSETS=$(gh release view repo --repo "${{ github.repository }}" --json assets -q '.assets[].name' 2>/dev/null || true)

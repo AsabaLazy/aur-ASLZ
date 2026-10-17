@@ -11,7 +11,7 @@ A collection of AUR packages maintained by ASLZ.
 编辑 `/etc/pacman.conf`，在文件末尾添加：
 
 ```ini
-[astrlink]
+[aslz]
 SigLevel = Optional TrustAll
 Server = https://github.com/AsabaLazy/aur-ASLZ/releases/download/repo
 # 国内免代理加速镜像（可选备用节点）：
@@ -21,7 +21,7 @@ Server = https://github.com/AsabaLazy/aur-ASLZ/releases/download/repo
 或者在终端中执行以下命令添加：
 
 ```bash
-grep -q '^\[astrlink\]' /etc/pacman.conf || printf '\n[astrlink]\nSigLevel = Optional TrustAll\nServer = https://github.com/AsabaLazy/aur-ASLZ/releases/download/repo\n' | sudo tee -a /etc/pacman.conf
+grep -q '^\[aslz\]' /etc/pacman.conf || printf '\n[aslz]\nSigLevel = Optional TrustAll\nServer = https://github.com/AsabaLazy/aur-ASLZ/releases/download/repo\n' | sudo tee -a /etc/pacman.conf
 ```
 
 更新软件包缓存：

@@ -1,6 +1,6 @@
 # Agent Instructions
 
-Personal Arch Linux repository (`[astrlink]`). Prebuilt binaries only (`<name>-bin`).
+Personal Arch Linux repository (`[aslz]`). Prebuilt binaries only (`<name>-bin`).
 
 ## Rules for Adding Packages
 
