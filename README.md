@@ -14,8 +14,6 @@ A collection of AUR packages maintained by ASLZ.
 [aslz]
 SigLevel = Optional TrustAll
 Server = https://github.com/AsabaLazy/aur-ASLZ/releases/download/repo
-# 国内免代理加速镜像（可选备用节点）：
-# Server = https://mirror.ghproxy.com/https://github.com/AsabaLazy/aur-ASLZ/releases/download/repo
 ```
 
 或者在终端中执行以下命令添加：
