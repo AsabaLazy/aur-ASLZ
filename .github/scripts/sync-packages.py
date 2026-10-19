@@ -24,6 +24,11 @@ PACKAGES = [
         "asset_pattern": r"Gopeed-.*-linux-amd64\.deb",
     },
     {
+        "name": "gopeed-fluent-bin",
+        "upstream": "AsabaLazy/gopeed-fluent",
+        "asset_pattern": r"Gopeed_Fluent_.*_linux_amd64\.deb",
+    },
+    {
         "name": "novelmikuer-bin",
         "upstream": "AsabaLazy/NovelMikuer",
         "asset_pattern": r"NovelMikuer_.*_amd64\.deb",

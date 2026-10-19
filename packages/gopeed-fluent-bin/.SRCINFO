@@ -1,0 +1,21 @@
+pkgbase = gopeed-fluent-bin
+	pkgdesc = High speed downloader with Fluent UI (official prebuilt binary)
+	pkgver = 1.9.3
+	pkgrel = 1
+	url = https://github.com/AsabaLazy/gopeed-fluent
+	arch = x86_64
+	license = GPL-3.0-only
+	depends = gtk3
+	depends = libdbusmenu-glib
+	depends = libayatana-appindicator
+	depends = libayatana-indicator
+	depends = ayatana-ido
+	depends = libkeybinder3
+	provides = gopeed-fluent
+	conflicts = gopeed-fluent
+	options = !debug
+	options = !strip
+	source_x86_64 = gopeed-fluent-bin-1.9.3.deb::https://github.com/AsabaLazy/gopeed-fluent/releases/download/v1.9.3/Gopeed_Fluent_1.9.3_linux_amd64.deb
+	sha256sums_x86_64 = SKIP
+
+pkgname = gopeed-fluent-bin
