@@ -11,7 +11,7 @@ provides=('gopeed-fluent')
 conflicts=('gopeed-fluent')
 options=('!debug' '!strip')
 source_x86_64=("${pkgname}-${pkgver}.deb::https://github.com/AsabaLazy/gopeed-fluent/releases/download/v${pkgver}/Gopeed_Fluent_${pkgver}_linux_amd64.deb")
-sha256sums_x86_64=('SKIP')
+sha256sums_x86_64=('027d2043e3992d8f507ebdf8356e00176ce4aafab36ac19e607b90482545150a')
 
 package() {
   bsdtar -xf data.tar.* -C "${pkgdir}"

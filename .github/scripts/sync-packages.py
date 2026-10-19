@@ -84,7 +84,7 @@ def update_pkgbuild(name, version, sha256, download_url):
 
     content = re.sub(r"^pkgver=.*", f"pkgver={version}", content, flags=re.MULTILINE)
     content = re.sub(r"^pkgrel=.*", "pkgrel=1", content, flags=re.MULTILINE)
-    content = re.sub(r"(sha256sums_x86_64=\(')[0-9a-fA-F]+", rf"\g<1>{sha256}", content)
+    content = re.sub(r"(sha256sums_x86_64=\(')[^']+", rf"\g<1>{sha256}", content)
     content = re.sub(r'::https://[^"]+', rf'::{download_url}', content)
 
     with open(pkgbuild_path, "w") as f:
