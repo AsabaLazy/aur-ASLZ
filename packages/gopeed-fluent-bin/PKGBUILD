@@ -10,7 +10,7 @@ depends=('gtk3' 'libdbusmenu-glib' 'libayatana-appindicator' 'libayatana-indicat
 provides=('gopeed-fluent')
 conflicts=('gopeed-fluent')
 options=('!debug' '!strip')
-source_x86_64=("${pkgname}-${pkgver}.deb::https://github.com/AsabaLazy/gopeed-fluent/releases/download/v${pkgver}/Gopeed_Fluent_${pkgver}_linux_amd64.deb")
+source_x86_64=("${pkgname}-${pkgver}.deb::https://github.com/AsabaLazy/gopeed-fluent/releases/download/v1.9.3/Gopeed_Fluent_1.9.3_linux_amd64.deb")
 sha256sums_x86_64=('027d2043e3992d8f507ebdf8356e00176ce4aafab36ac19e607b90482545150a')
 
 package() {
