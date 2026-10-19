@@ -2,8 +2,8 @@ name: AUR Package & Publish
 
 on:
   schedule:
-    # 每天 04:00 UTC (北京时间 12:00) 自动同步上游最新版本
-    - cron: "0 4 * * *"
+    # 每天 06:00, 18:00 UTC (北京时间 14:00, 02:00) 自动同步上游最新版本
+    - cron: "0 6,18 * * *"
   workflow_dispatch:
     inputs:
       force:

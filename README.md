@@ -4,7 +4,7 @@ A collection of AUR packages maintained by ASLZ.
 
 [![Build Status](https://github.com/AsabaLazy/aur-ASLZ/actions/workflows/aur.yml/badge.svg)](https://github.com/AsabaLazy/aur-ASLZ/actions/workflows/aur.yml)
 
-> 仓库每日 12:00（UTC 04:00）自动检测并同步上游最新版本。
+> 仓库每日 02:00、14:00（UTC 18:00、06:00）自动检测并同步上游最新版本。
 
 ## 使用方法
 
