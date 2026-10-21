@@ -1,6 +1,6 @@
 # Maintainer: Google LLC <https://github.com/google-antigravity/antigravity-cli>
 pkgname=antigravity-cli-bin
-pkgver=1.4.3
+pkgver=1.4.4
 pkgrel=1
 pkgdesc="Google's agentic development platform (CLI companion)"
 arch=('x86_64')
@@ -11,8 +11,8 @@ optdepends=('antigravity: authenticate and share session state with desktop appl
 provides=('antigravity-cli' 'agy')
 conflicts=('antigravity-cli' 'agy')
 options=('!debug' '!strip')
-source_x86_64=("${pkgname}-${pkgver}.tar.gz::https://github.com/google-antigravity/antigravity-cli/releases/download/1.4.3/agy_cli_linux_x64.tar.gz")
-sha256sums_x86_64=('319b2cb3240d244930bd077033b466941fd7ba6f0881d783eee801dbd2fb9371')
+source_x86_64=("${pkgname}-${pkgver}.tar.gz::https://github.com/google-antigravity/antigravity-cli/releases/download/1.4.4/agy_cli_linux_x64.tar.gz")
+sha256sums_x86_64=('9ae4f7f0667a2868e15bb9ad93819ff7527c7187f12d12e3b5191137c726287b')
 
 package() {
   install -Dm755 "${srcdir}/antigravity" "${pkgdir}/usr/bin/agy"
