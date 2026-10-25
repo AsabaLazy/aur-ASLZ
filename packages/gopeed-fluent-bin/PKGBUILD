@@ -1,6 +1,6 @@
 # Maintainer: AsabaLazy <https://github.com/AsabaLazy/gopeed-fluent>
 pkgname=gopeed-fluent-bin
-pkgver=1.9.3
+pkgver=1.1.3
 pkgrel=1
 pkgdesc="High speed downloader with Fluent UI (official prebuilt binary)"
 arch=('x86_64')
@@ -10,8 +10,8 @@ depends=('gtk3' 'libdbusmenu-glib' 'libayatana-appindicator' 'libayatana-indicat
 provides=('gopeed-fluent')
 conflicts=('gopeed-fluent')
 options=('!debug' '!strip')
-source_x86_64=("${pkgname}-${pkgver}.deb::https://github.com/AsabaLazy/gopeed-fluent/releases/download/v1.9.3/Gopeed_Fluent_1.9.3_linux_amd64.deb")
-sha256sums_x86_64=('027d2043e3992d8f507ebdf8356e00176ce4aafab36ac19e607b90482545150a')
+source_x86_64=("${pkgname}-${pkgver}.deb::https://github.com/AsabaLazy/gopeed-fluent/releases/download/v1.1.3/Gopeed_Fluent_1.1.3_linux_amd64.deb")
+sha256sums_x86_64=('614cfa223a6855c27eb616d225d3ef2465e91cf7c021f1147227ac981c022eb6')
 
 package() {
   bsdtar -xf data.tar.* -C "${pkgdir}"

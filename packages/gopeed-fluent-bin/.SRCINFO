@@ -1,6 +1,6 @@
 pkgbase = gopeed-fluent-bin
 	pkgdesc = High speed downloader with Fluent UI (official prebuilt binary)
-	pkgver = 1.9.3
+	pkgver = 1.1.3
 	pkgrel = 1
 	url = https://github.com/AsabaLazy/gopeed-fluent
 	arch = x86_64
@@ -15,7 +15,7 @@ pkgbase = gopeed-fluent-bin
 	conflicts = gopeed-fluent
 	options = !debug
 	options = !strip
-	source_x86_64 = gopeed-fluent-bin-1.9.3.deb::https://github.com/AsabaLazy/gopeed-fluent/releases/download/v1.9.3/Gopeed_Fluent_1.9.3_linux_amd64.deb
-	sha256sums_x86_64 = 027d2043e3992d8f507ebdf8356e00176ce4aafab36ac19e607b90482545150a
+	source_x86_64 = gopeed-fluent-bin-1.1.3.deb::https://github.com/AsabaLazy/gopeed-fluent/releases/download/v1.1.3/Gopeed_Fluent_1.1.3_linux_amd64.deb
+	sha256sums_x86_64 = 614cfa223a6855c27eb616d225d3ef2465e91cf7c021f1147227ac981c022eb6
 
 pkgname = gopeed-fluent-bin
