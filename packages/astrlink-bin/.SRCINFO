@@ -1,6 +1,6 @@
 pkgbase = astrlink-bin
 	pkgdesc = AI API Gateway & Desktop Client
-	pkgver = 0.2.18
+	pkgver = 0.2.19
 	pkgrel = 1
 	url = https://github.com/Calcium-Ion/AstrLink
 	arch = x86_64
@@ -13,7 +13,7 @@ pkgbase = astrlink-bin
 	conflicts = astrlink
 	options = !debug
 	options = !strip
-	source_x86_64 = https://github.com/Calcium-Ion/AstrLink/releases/download/v0.2.18/AstrLink_0.2.18_amd64.deb
-	sha256sums_x86_64 = 578ab044ff85e199ffbd6767991342d497e5718f32454c0df457ef89cc1f6923
+	source_x86_64 = https://github.com/Calcium-Ion/AstrLink/releases/download/v0.2.19/AstrLink_0.2.19_amd64.deb
+	sha256sums_x86_64 = c65a8007bbf23273e67df8c2a16109b27861a64c146764c78c4ded071c8c5247
 
 pkgname = astrlink-bin
