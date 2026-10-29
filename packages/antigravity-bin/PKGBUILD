@@ -1,0 +1,58 @@
+# Maintainer: AsabaLazy
+
+pkgname=antigravity-bin
+pkgver=2.28.2
+pkgrel=1
+# execution_id from the official /releases feed
+_build=5937220255875072
+pkgdesc='Google Antigravity agentic development platform (prebuilt desktop client)'
+arch=('x86_64')
+url='https://antigravity.google/'
+license=('LicenseRef-Google-Antigravity')
+provides=('antigravity')
+conflicts=('antigravity')
+depends=('alsa-lib'
+         'at-spi2-core'
+         'cairo'
+         'dbus'
+         'expat'
+         'glib2'
+         'glibc'
+         'gtk3'
+         'libcups'
+         'libgcc'
+         'libx11'
+         'libxcb'
+         'libxcomposite'
+         'libxdamage'
+         'libxext'
+         'libxfixes'
+         'libxkbcommon'
+         'libxrandr'
+         'mesa'
+         'nspr'
+         'nss'
+         'pango'
+         'systemd-libs')
+options=('!debug' '!strip')
+source=('antigravity.desktop'
+        'antigravity.png')
+source_x86_64=("${pkgname}-${pkgver}.tar.gz::https://storage.googleapis.com/antigravity-public/antigravity-hub/${pkgver}-${_build}/linux-x64/Antigravity.tar.gz")
+sha256sums=('b73a53109cd82c5c16fdf042a2203b2d46cd535a97442afd3c39cb506e1bf569'
+            'b27f0e4a6f14f491ba31bb24533a1f43c677362b12a0744a53fdd09d7c785317')
+sha256sums_x86_64=('bd92938b088863baff568b08236f76f0d237e8a39581077a07937f4dc6e138c3')
+
+package() {
+  install -d "${pkgdir}/opt"
+  cp -a Antigravity-*/ "${pkgdir}/opt/antigravity"
+
+  install -d "${pkgdir}/usr/bin"
+  ln -s /opt/antigravity/antigravity "${pkgdir}/usr/bin/antigravity"
+
+  install -d "${pkgdir}/usr/share/licenses/${pkgname}"
+  ln -s /opt/antigravity/LICENSE.electron.txt "${pkgdir}/usr/share/licenses/${pkgname}/"
+  ln -s /opt/antigravity/LICENSES.chromium.html "${pkgdir}/usr/share/licenses/${pkgname}/"
+
+  install -Dm644 antigravity.desktop "${pkgdir}/usr/share/applications/antigravity.desktop"
+  install -Dm644 antigravity.png "${pkgdir}/usr/share/icons/hicolor/512x512/apps/antigravity.png"
+}
