@@ -71,27 +71,73 @@ def fetch_text(url):
 def version_tuple(version):
     return tuple(int(part) for part in re.findall(r"\d+", version))
 
+REQUIRED_DB_ASSETS = {"aslz.db", "aslz.db.tar.gz", "aslz.files", "aslz.files.tar.gz"}
+
 def get_pkgbuild_var(name, var):
     path = f"packages/{name}/PKGBUILD"
     if not os.path.exists(path):
         return None
     with open(path) as f:
         m = re.search(rf"^{re.escape(var)}=(.+)", f.read(), re.MULTILINE)
-    return m.group(1).strip() if m else None
+    return m.group(1).strip().strip("'\"") if m else None
 
-def already_published(repo, name, version, force):
-    if not repo or force:
-        return False
+def get_release_assets(repo):
+    if not repo:
+        return None
     res = subprocess.run(
         [
             "gh", "release", "view", "repo", "--repo", repo,
-            "--json", "assets", "-q",
-            f'.assets[] | select(.name | startswith("{name}-{version}-")) | .name',
+            "--json", "assets", "-q", ".assets[].name",
         ],
         capture_output=True,
         text=True,
     )
-    return bool(res.stdout.strip())
+    if res.returncode != 0:
+        print(f"  Warning: gh release view failed: {res.stderr.strip()}", file=sys.stderr)
+        return set()
+    return {line.strip() for line in res.stdout.splitlines() if line.strip()}
+
+def already_published(release_assets, name, version, force):
+    if release_assets is None or force:
+        return False
+    pattern = re.compile(rf"^{re.escape(name)}-{re.escape(version)}-[^-]+-[^-]+\.pkg\.tar\.zst$")
+    return any(pattern.match(asset) for asset in release_assets)
+
+def has_repo_drift(release_assets):
+    if release_assets is None:
+        return True
+
+    drift = False
+    missing_db = sorted(REQUIRED_DB_ASSETS - release_assets)
+    if missing_db:
+        print(f"  [SYNC] Missing repo database asset(s): {', '.join(missing_db)}")
+        drift = True
+
+    expected_patterns = []
+    if os.path.isdir("packages"):
+        for entry in sorted(os.listdir("packages")):
+            pkgbuild_path = os.path.join("packages", entry, "PKGBUILD")
+            if entry == "repo" or not os.path.isfile(pkgbuild_path):
+                continue
+            pkgname = get_pkgbuild_var(entry, "pkgname") or entry
+            pkgver = get_pkgbuild_var(entry, "pkgver")
+            pkgrel = get_pkgbuild_var(entry, "pkgrel") or "1"
+            if not pkgver:
+                continue
+            pat = re.compile(
+                rf"^{re.escape(pkgname)}-{re.escape(pkgver)}-{re.escape(pkgrel)}-[^-]+\.pkg\.tar\.zst$"
+            )
+            expected_patterns.append(pat)
+            if not any(pat.match(a) for a in release_assets):
+                print(f"  [SYNC] Missing release package: {pkgname}-{pkgver}-{pkgrel}")
+                drift = True
+
+    for asset in sorted(release_assets):
+        if asset.endswith(".pkg.tar.zst") and not any(p.match(asset) for p in expected_patterns):
+            print(f"  [SYNC] Obsolete release package: {asset}")
+            drift = True
+
+    return drift
 
 def stream_sha256(download_url):
     print(f"  Streaming {download_url} to calculate sha256...")
@@ -183,10 +229,14 @@ def update_pkgbuild(name, version, sha256, download_url, build=None, bump_pkgrel
     with open(pkgbuild_path, "r") as f:
         content = f.read()
 
+    old_ver = re.search(r"^pkgver=(.+)", content, re.MULTILINE)
+    same_ver = bool(old_ver and old_ver.group(1).strip().strip("'\"") == version)
     content = re.sub(r"^pkgver=.*", f"pkgver={version}", content, flags=re.MULTILINE)
+    m = re.search(r"^pkgrel=(\d+)", content, re.MULTILINE)
     if bump_pkgrel:
-        m = re.search(r"^pkgrel=(\d+)", content, re.MULTILINE)
         pkgrel = str(int(m.group(1)) + 1) if m else "1"
+    elif same_ver and m:
+        pkgrel = m.group(1)
     else:
         pkgrel = "1"
     content = re.sub(r"^pkgrel=.*", f"pkgrel={pkgrel}", content, flags=re.MULTILINE)
@@ -202,6 +252,7 @@ def update_pkgbuild(name, version, sha256, download_url, build=None, bump_pkgrel
 def main():
     repo = os.environ.get("GITHUB_REPOSITORY", "AsabaLazy/aur-ASLZ")
     force = os.environ.get("FORCE_BUILD", "false").lower() == "true"
+    release_assets = get_release_assets(repo)
     updated_packages = []
 
     for pkg in PACKAGES:
@@ -225,7 +276,7 @@ def main():
             rebuild = current_version == version and current_build != build
             download_url = pkg["download_url_template"].format(version=version, build=build)
 
-            if not rebuild and already_published(repo, name, version, force):
+            if not rebuild and already_published(release_assets, name, version, force):
                 print(f"  [OK] {name} is up-to-date with {version}.")
                 continue
 
@@ -256,7 +307,7 @@ def main():
 
             download_url = pkg["download_url_template"].format(version=version)
 
-            if already_published(repo, name, version, force):
+            if already_published(release_assets, name, version, force):
                 print(f"  [OK] {name} is up-to-date with {version}.")
                 continue
 
@@ -289,7 +340,7 @@ def main():
         version = tag.lstrip("v")
 
         # 检查是否已打包发布过
-        if already_published(repo, name, version, force):
+        if already_published(release_assets, name, version, force):
             print(f"  [OK] {name} is up-to-date with {tag}.")
             continue
 
@@ -322,8 +373,12 @@ def main():
         if update_pkgbuild(name, version, sha256, download_url):
             updated_packages.append(name)
 
-    skip = len(updated_packages) == 0 and not force
-    print(f"\nSummary: {len(updated_packages)} package(s) updated. Skip build: {skip}")
+    repo_drift = has_repo_drift(release_assets)
+    skip = len(updated_packages) == 0 and not repo_drift and not force
+    print(
+        f"\nSummary: {len(updated_packages)} package(s) updated, "
+        f"repo drift: {repo_drift}. Skip build: {skip}"
+    )
 
     github_output = os.environ.get("GITHUB_OUTPUT")
     if github_output:

@@ -1,7 +1,7 @@
 pkgbase = antigravity-cli-bin
 	pkgdesc = Google's agentic development platform (CLI companion)
 	pkgver = 1.4.11
-	pkgrel = 1
+	pkgrel = 2
 	url = https://antigravity.google
 	arch = x86_64
 	license = custom:proprietary

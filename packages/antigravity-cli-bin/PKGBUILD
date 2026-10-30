@@ -1,7 +1,7 @@
 # Maintainer: Google LLC <https://github.com/google-antigravity/antigravity-cli>
 pkgname=antigravity-cli-bin
 pkgver=1.4.11
-pkgrel=1
+pkgrel=2
 pkgdesc="Google's agentic development platform (CLI companion)"
 arch=('x86_64')
 url="https://antigravity.google"
@@ -16,5 +16,4 @@ sha256sums_x86_64=('d17c426977326361f3d81f3ea22820e967164285923de020247e460dcb9d
 
 package() {
   install -Dm755 "${srcdir}/antigravity" "${pkgdir}/usr/bin/agy"
-  ln -sf agy "${pkgdir}/usr/bin/antigravity"
 }
