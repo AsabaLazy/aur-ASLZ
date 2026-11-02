@@ -41,6 +41,7 @@ sudo pacman -Sy
 | [`novelmikuer-bin`](https://github.com/AsabaLazy/NovelMikuer) | `sudo pacman -S novelmikuer-bin` | Batch replace and clean novel text (compatible with Legado 3.0) |
 | [`antigravity-cli-bin`](https://github.com/google-antigravity/antigravity-cli) | `sudo pacman -S antigravity-cli-bin` | Google's agentic development platform (CLI companion) |
 | [`antigravity-cli-fix-bin`](https://github.com/google-antigravity/antigravity-cli) | `sudo pacman -S antigravity-cli-fix-bin` | Google's agentic development platform (CLI companion, patched to unlock 900K context window and remove 256K compaction clamp) |
+| [`antigravity-cli-512k-bin`](https://github.com/google-antigravity/antigravity-cli) | `sudo pacman -S antigravity-cli-512k-bin` | Google's agentic development platform (CLI companion, patched to 512K context compaction ceiling) |
 | [`antigravity-bin`](https://antigravity.google/) | `sudo pacman -S antigravity-bin` | Google Antigravity agentic development platform (desktop client) |
 | [`dimagent-bin`](https://dimagent.cn) | `sudo pacman -S dimagent-bin` | DimAgent desktop client — AI coding agent |
 
