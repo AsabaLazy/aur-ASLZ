@@ -1,0 +1,21 @@
+pkgbase = antigravity-cli-fix-bin
+	pkgdesc = Google's agentic development platform (CLI companion, patched to unlock 900K context window and remove 256K compaction clamp)
+	pkgver = 1.4.12
+	pkgrel = 1
+	url = https://antigravity.google
+	arch = x86_64
+	license = custom:proprietary
+	depends = glibc
+	optdepends = antigravity: authenticate and share session state with desktop application
+	provides = antigravity-cli
+	provides = antigravity-cli-bin
+	provides = agy
+	conflicts = antigravity-cli
+	conflicts = antigravity-cli-bin
+	conflicts = agy
+	options = !debug
+	options = !strip
+	source_x86_64 = antigravity-cli-fix-bin-1.4.12.tar.gz::https://github.com/google-antigravity/antigravity-cli/releases/download/1.4.12/agy_cli_linux_x64.tar.gz
+	sha256sums_x86_64 = 3368d1923fc869f21ec8fce83252a8c96c89283aac9393958ac91fbf7a3949e4
+
+pkgname = antigravity-cli-fix-bin

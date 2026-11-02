@@ -39,6 +39,11 @@ PACKAGES = [
         "asset_pattern": r"^agy_cli_linux_x64\.tar\.gz$",
     },
     {
+        "name": "antigravity-cli-fix-bin",
+        "upstream": "google-antigravity/antigravity-cli",
+        "asset_pattern": r"^agy_cli_linux_x64\.tar\.gz$",
+    },
+    {
         "name": "antigravity-bin",
         # Official feed used by antigravity.google/download. The manifest is the
         # app's electron-updater config; the page is a last-resort fallback.

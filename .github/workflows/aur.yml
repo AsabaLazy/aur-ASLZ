@@ -46,6 +46,7 @@ jobs:
             -w /packages \
             archlinux:base-devel bash -c '
               set -euo pipefail
+              pacman -Sy --noconfirm --needed python
               useradd -m builder && chown -R builder .
               mkdir -p repo
               for pkg_dir in */ ; do
