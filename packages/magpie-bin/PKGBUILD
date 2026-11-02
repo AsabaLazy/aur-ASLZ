@@ -1,6 +1,6 @@
 # Maintainer: yetone <https://github.com/yetone/magpie>
 pkgname=magpie-bin
-pkgver=0.1.2736
+pkgver=0.1.2738
 pkgrel=1
 pkgdesc="Every agent's model. One place. Codex on DeepSeek, Claude Code on Kimi, from menu bar"
 arch=('x86_64')
@@ -10,10 +10,10 @@ depends=('glib2' 'gtk3' 'gdk-pixbuf2' 'hicolor-icon-theme' 'libsoup3' 'libx11' '
 provides=('magpie')
 conflicts=('magpie')
 options=('!debug' '!strip')
-source_x86_64=("magpie-${pkgver}::https://github.com/yetone/magpie/releases/download/v0.1.2736/magpie-linux-amd64"
+source_x86_64=("magpie-${pkgver}::https://github.com/yetone/magpie/releases/download/v0.1.2738/magpie-linux-amd64"
                "magpie.desktop"
                "magpie.png")
-sha256sums_x86_64=('49a6437af0647a7c20418e56f8f6cd704d1d61384d16c3ef4e457b1b74ca1f9c'
+sha256sums_x86_64=('00ac1faed1c37b3c16f03dabfb8372caa64a8a8ccea61ac8031fa88ce4490dcc'
                    '7e8ad08b3ab30057e7f05a66a62d8cec9fe384be5ec68558f8bfbd3ec819df9f'
                    '57437c6596e05a8fcfc42d4288c030aa00ed86b69fe35d464d69d7026150c704')
 
