@@ -1,6 +1,6 @@
 pkgbase = dimagent-bin
 	pkgdesc = DimAgent desktop client — AI coding agent
-	pkgver = 0.9.60
+	pkgver = 0.9.61
 	pkgrel = 1
 	url = https://dimagent.cn
 	arch = x86_64
@@ -21,7 +21,7 @@ pkgbase = dimagent-bin
 	conflicts = dimagent
 	options = !debug
 	options = !strip
-	source_x86_64 = dimagent-bin-0.9.60.deb::https://dimcode.echooai.com/updates/stable/linux/x64/DimAgent-0.9.60.deb
-	sha256sums_x86_64 = 06d9063fe70ae49aeb35a7fab5c949333c074458be5a71ce3904ecd1ef07912b
+	source_x86_64 = dimagent-bin-0.9.61.deb::https://dimcode.echooai.com/updates/stable/linux/x64/DimAgent-0.9.61.deb
+	sha256sums_x86_64 = 91d1c79201e082244b2e6219a10ae8b5a561fe0ddc5264159de20e7cb05e2262
 
 pkgname = dimagent-bin
