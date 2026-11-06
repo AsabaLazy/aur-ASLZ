@@ -2,7 +2,7 @@
 pkgname=leigod-plugin-bin
 pkgver=1.3.0.02
 pkgrel=11
-_commit=f46b40fbe481ee2666a3debe0863ad39ac272333
+_commit=db2a3b85aa883f29286650bf8912d165951f84ad
 pkgdesc="Leigod Accelerator SteamDeck plugin compatibility layer & WebUI for x86_64 Linux"
 arch=('x86_64')
 url="https://github.com/AsabaLazy/leigod-plugin-linux"
