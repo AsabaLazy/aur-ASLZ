@@ -2,23 +2,32 @@ post_install() {
   if [ ! -e /home/leigod ] || [ -L /home/leigod ]; then
     ln -sfn /opt/leigod /home/leigod
   fi
-  echo "==> Enable and start the service: sudo systemctl enable --now leigod_plugin.service"
+  echo "==> Enable and start services: sudo systemctl enable --now leigod_plugin.service leigod_webui.service"
+  echo "==> WebUI Control Panel: http://127.0.0.1:8088"
 }
 
 post_upgrade() {
   if [ ! -e /home/leigod ] || [ -L /home/leigod ]; then
     ln -sfn /opt/leigod /home/leigod
   fi
-  if command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet leigod_plugin.service 2>/dev/null; then
+  if command -v systemctl >/dev/null 2>&1; then
     systemctl daemon-reload 2>/dev/null || true
-    systemctl restart leigod_plugin.service 2>/dev/null || true
+    if systemctl is-active --quiet leigod_plugin.service 2>/dev/null; then
+      systemctl restart leigod_plugin.service 2>/dev/null || true
+    fi
+    if systemctl is-active --quiet leigod_webui.service 2>/dev/null; then
+      systemctl restart leigod_webui.service 2>/dev/null || true
+    fi
   fi
 }
 
 pre_remove() {
   if command -v systemctl >/dev/null 2>&1; then
-    systemctl stop leigod_plugin.service 2>/dev/null || true
-    systemctl disable leigod_plugin.service 2>/dev/null || true
+    systemctl stop leigod_webui.service leigod_plugin.service 2>/dev/null || true
+    systemctl disable leigod_webui.service leigod_plugin.service 2>/dev/null || true
+  fi
+  if [ -x /opt/leigod/leigod_cleanup_net.sh ]; then
+    /opt/leigod/leigod_cleanup_net.sh 2>/dev/null || true
   fi
   if [ -r /var/lib/leigod/device-mac ] && command -v ip >/dev/null 2>&1 \
       && ip -d link show wlan0 2>/dev/null | grep -qw dummy; then

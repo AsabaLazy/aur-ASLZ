@@ -66,9 +66,9 @@ PACKAGES = [
     },
     {
         "name": "leigod-plugin-bin",
-        "upstream": "Husky0c/leigod-plugin-linux",
+        "upstream": "AsabaLazy/leigod-plugin-linux",
         "asset_pattern": r"^acc-gw\.router\.amd64$",
-        "release_env_url": "https://raw.githubusercontent.com/Husky0c/leigod-plugin-linux/main/release.env",
+        "release_env_url": "https://raw.githubusercontent.com/AsabaLazy/leigod-plugin-linux/main/release.env",
         "binary_url": "http://119.3.40.126/acc-gw.router.amd64",
         "xdb_url": "http://119.3.40.126/ipdatacloud_country.xdb",
     },
