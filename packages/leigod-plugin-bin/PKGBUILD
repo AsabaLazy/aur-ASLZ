@@ -1,0 +1,59 @@
+# Maintainer: AsabaLazy <https://github.com/AsabaLazy/aur-ASLZ>
+pkgname=leigod-plugin-bin
+pkgver=1.3.0.02
+pkgrel=1
+_commit=0286b6c56ddd2baaf7941a994d3d17ce0701728e
+pkgdesc="Leigod Accelerator SteamDeck plugin compatibility layer for x86_64 Linux"
+arch=('x86_64')
+url="https://github.com/Husky0c/leigod-plugin-linux"
+license=('MIT' 'LicenseRef-Proprietary')
+depends=('ca-certificates' 'curl' 'iproute2' 'ipset' 'iptables' 'procps-ng' 'systemd')
+provides=('leigod-plugin')
+conflicts=('leigod-plugin')
+options=('!debug' '!strip')
+install="${pkgname}.install"
+backup=(
+  'opt/leigod/config/accelerator.ini'
+  'opt/leigod/config/acc_version.ini'
+  'opt/leigod/config/new_upgrade_conf.json'
+)
+source_x86_64=(
+  "${pkgname}-${pkgver}-${_commit}.tar.gz::https://github.com/Husky0c/leigod-plugin-linux/archive/${_commit}.tar.gz"
+  "acc-gw.router.amd64-${pkgver}::http://119.3.40.126/acc-gw.router.amd64"
+  "ipdatacloud_country.xdb-${pkgver}::http://119.3.40.126/ipdatacloud_country.xdb"
+)
+sha256sums_x86_64=(
+  '7ed03bac0414025ea661bcb9fcde7d1e01c6932e33b92e7af9e1a473c637745c'
+  '3640d47abaee4a6b4312e3489137311ab309d27dcb92ab640c0fe3d953328c1b'
+  '3536000ee9eb3997538cb37a14f90d571979734c48b23b8d548eceac16666273'
+)
+
+package() {
+  cd "${srcdir}/leigod-plugin-linux-${_commit}"
+
+  install -dm755 "${pkgdir}/opt/leigod/config"
+  install -Dm755 "opt/leigod/steamdeck_acc_monitor.sh" "${pkgdir}/opt/leigod/steamdeck_acc_monitor.sh"
+  install -Dm755 "opt/leigod/leigod_uninstall.sh" "${pkgdir}/opt/leigod/leigod_uninstall.sh"
+  install -Dm755 "scripts/device-mac.sh" "${pkgdir}/opt/leigod/device-mac.sh"
+  install -Dm644 "opt/leigod/fake_os-release" "${pkgdir}/opt/leigod/fake_os-release"
+  install -Dm644 "opt/leigod/fake_product_name" "${pkgdir}/opt/leigod/fake_product_name"
+
+  install -Dm644 "opt/leigod/config/acc_version.ini" "${pkgdir}/opt/leigod/config/acc_version.ini"
+  sed -i "s/^version=.*/version=${pkgver}/" "${pkgdir}/opt/leigod/config/acc_version.ini"
+  install -Dm644 "opt/leigod/config/accelerator.ini" "${pkgdir}/opt/leigod/config/accelerator.ini"
+  install -Dm644 "opt/leigod/config/new_upgrade_conf.json" "${pkgdir}/opt/leigod/config/new_upgrade_conf.json"
+  : > "${pkgdir}/opt/leigod/config/accelerator"
+  chmod 0644 "${pkgdir}/opt/leigod/config/accelerator"
+
+  install -Dm755 "${srcdir}/acc-gw.router.amd64-${pkgver}" "${pkgdir}/opt/leigod/acc-gw.router.amd64"
+  install -Dm755 "${srcdir}/acc-gw.router.amd64-${pkgver}" "${pkgdir}/opt/leigod/acc_upgrade_monitor"
+  install -Dm644 "${srcdir}/ipdatacloud_country.xdb-${pkgver}" "${pkgdir}/opt/leigod/config/ipdatacloud_country.xdb"
+
+  install -Dm644 "systemd/leigod_plugin.service" "${pkgdir}/usr/lib/systemd/system/leigod_plugin.service"
+  install -Dm644 /dev/stdin "${pkgdir}/usr/lib/tmpfiles.d/leigod-plugin.conf" << 'EOF'
+L /home/leigod - - - - /opt/leigod
+EOF
+
+  install -Dm644 "LICENSE" "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+  install -Dm644 "THIRD_PARTY_NOTICES.md" "${pkgdir}/usr/share/licenses/${pkgname}/THIRD_PARTY_NOTICES.md"
+}

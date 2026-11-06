@@ -64,6 +64,14 @@ PACKAGES = [
         "manifest_url": "https://dimcode.echooai.com/updates/stable/linux/x64/latest-linux.yml",
         "download_url_template": "https://dimcode.echooai.com/updates/stable/linux/x64/DimAgent-{version}.deb",
     },
+    {
+        "name": "leigod-plugin-bin",
+        "upstream": "Husky0c/leigod-plugin-linux",
+        "asset_pattern": r"^acc-gw\.router\.amd64$",
+        "release_env_url": "https://raw.githubusercontent.com/Husky0c/leigod-plugin-linux/main/release.env",
+        "binary_url": "http://119.3.40.126/acc-gw.router.amd64",
+        "xdb_url": "http://119.3.40.126/ipdatacloud_country.xdb",
+    },
 ]
 
 def make_headers(url):
@@ -259,6 +267,37 @@ def update_pkgbuild(name, version, sha256, download_url, build=None, bump_pkgrel
         f.write(content)
     return True
 
+def update_leigod_pkgbuild(name, version, commit, archive_sha256, bin_sha256, xdb_sha256, bump_pkgrel=False):
+    pkgbuild_path = f"packages/{name}/PKGBUILD"
+    if not os.path.exists(pkgbuild_path):
+        print(f"  Error: {pkgbuild_path} does not exist", file=sys.stderr)
+        return False
+
+    with open(pkgbuild_path, "r") as f:
+        content = f.read()
+
+    old_ver = re.search(r"^pkgver=(.+)", content, re.MULTILINE)
+    same_ver = bool(old_ver and old_ver.group(1).strip().strip("'\"") == version)
+    content = re.sub(r"^pkgver=.*", f"pkgver={version}", content, flags=re.MULTILINE)
+    m = re.search(r"^pkgrel=(\d+)", content, re.MULTILINE)
+    if bump_pkgrel:
+        pkgrel = str(int(m.group(1)) + 1) if m else "1"
+    elif same_ver and m:
+        pkgrel = m.group(1)
+    else:
+        pkgrel = "1"
+    content = re.sub(r"^pkgrel=.*", f"pkgrel={pkgrel}", content, flags=re.MULTILINE)
+    content = re.sub(r"^_commit=.*", f"_commit={commit}", content, flags=re.MULTILINE)
+    content = re.sub(
+        r"sha256sums_x86_64=\(\s*'[^']+'\s*'[^']+'\s*'[^']+'\s*\)",
+        f"sha256sums_x86_64=(\n  '{archive_sha256}'\n  '{bin_sha256}'\n  '{xdb_sha256}'\n)",
+        content,
+    )
+
+    with open(pkgbuild_path, "w") as f:
+        f.write(content)
+    return True
+
 def main():
     repo = os.environ.get("GITHUB_REPOSITORY", "AsabaLazy/aur-ASLZ")
     force = os.environ.get("FORCE_BUILD", "false").lower() == "true"
@@ -329,6 +368,59 @@ def main():
                 continue
 
             if update_pkgbuild(name, version, sha256, download_url):
+                updated_packages.append(name)
+            continue
+
+        # 处理基于 release.env + 官方二进制直链的仓库（如 leigod-plugin-bin）
+        if "release_env_url" in pkg:
+            upstream = pkg["upstream"]
+            print(f"Checking {name} (upstream: {upstream})...")
+            try:
+                commit_api = f"https://api.github.com/repos/{upstream}/commits/main"
+                commit_data = json.loads(fetch_text(commit_api))
+                commit = commit_data["sha"]
+
+                req = urllib.request.Request(pkg["binary_url"], headers=make_headers(pkg["binary_url"]))
+                with urllib.request.urlopen(req) as resp:
+                    bin_bytes = resp.read()
+                bin_sha256 = hashlib.sha256(bin_bytes).hexdigest()
+                ver_match = re.search(rb"ipPortProtocolReport\x00([0-9]+(?:\.[0-9]+)+)\x00", bin_bytes)
+                if ver_match:
+                    version = ver_match.group(1).decode()
+                else:
+                    env_text = fetch_text(pkg["release_env_url"])
+                    m = re.search(r"^UPSTREAM_VERSION=(.+)", env_text, re.MULTILINE)
+                    if not m:
+                        raise ValueError("UPSTREAM_VERSION missing in release.env")
+                    version = m.group(1).strip().strip("'\"")
+
+                xdb_sha256 = stream_sha256(pkg["xdb_url"])
+            except Exception as e:
+                print(f"  Error fetching metadata for {name}: {e}", file=sys.stderr)
+                continue
+
+            current_version = get_pkgbuild_var(name, "pkgver")
+            current_commit = get_pkgbuild_var(name, "_commit")
+            with open(f"packages/{name}/PKGBUILD") as f:
+                current_content = f.read()
+            sums_changed = (bin_sha256 not in current_content) or (xdb_sha256 not in current_content)
+            rebuild = current_version == version and (current_commit != commit or sums_changed)
+
+            if not rebuild and not sums_changed and already_published(release_assets, name, version, force):
+                print(f"  [OK] {name} is up-to-date with {version} ({commit[:7]}).")
+                continue
+
+            print(f"  [UPDATE] {name} needs build for {version} ({commit[:7]}).")
+            archive_url = f"https://github.com/{upstream}/archive/{commit}.tar.gz"
+            try:
+                archive_sha256 = stream_sha256(archive_url)
+            except Exception as e:
+                print(f"  Error calculating checksum for {archive_url}: {e}", file=sys.stderr)
+                continue
+
+            if update_leigod_pkgbuild(
+                name, version, commit, archive_sha256, bin_sha256, xdb_sha256, bump_pkgrel=rebuild
+            ):
                 updated_packages.append(name)
             continue
 

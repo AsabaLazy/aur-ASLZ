@@ -1,0 +1,38 @@
+post_install() {
+  if [ ! -e /home/leigod ] || [ -L /home/leigod ]; then
+    ln -sfn /opt/leigod /home/leigod
+  fi
+  echo "==> Enable and start the service: sudo systemctl enable --now leigod_plugin.service"
+}
+
+post_upgrade() {
+  if [ ! -e /home/leigod ] || [ -L /home/leigod ]; then
+    ln -sfn /opt/leigod /home/leigod
+  fi
+  if command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet leigod_plugin.service 2>/dev/null; then
+    systemctl daemon-reload 2>/dev/null || true
+    systemctl restart leigod_plugin.service 2>/dev/null || true
+  fi
+}
+
+pre_remove() {
+  if command -v systemctl >/dev/null 2>&1; then
+    systemctl stop leigod_plugin.service 2>/dev/null || true
+    systemctl disable leigod_plugin.service 2>/dev/null || true
+  fi
+  if [ -r /var/lib/leigod/device-mac ] && command -v ip >/dev/null 2>&1 \
+      && ip -d link show wlan0 2>/dev/null | grep -qw dummy; then
+    expected=$(tr 'A-F' 'a-f' < /var/lib/leigod/device-mac | tr -d ' \t\r\n')
+    actual=$(cat /sys/class/net/wlan0/address 2>/dev/null || true)
+    if [ -n "$expected" ] && [ "$actual" = "$expected" ]; then
+      ip link delete wlan0 2>/dev/null || true
+    fi
+  fi
+}
+
+post_remove() {
+  if [ -L /home/leigod ] && [ "$(readlink /home/leigod)" = "/opt/leigod" ]; then
+    rm -f /home/leigod
+  fi
+  rm -rf /run/leigod
+}

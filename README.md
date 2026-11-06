@@ -44,6 +44,7 @@ sudo pacman -Sy
 | [`antigravity-cli-512k-bin`](https://github.com/google-antigravity/antigravity-cli) | `sudo pacman -S antigravity-cli-512k-bin` | Google's agentic development platform (CLI companion, patched to 512K context compaction ceiling) |
 | [`antigravity-bin`](https://antigravity.google/) | `sudo pacman -S antigravity-bin` | Google Antigravity agentic development platform (desktop client) |
 | [`dimagent-bin`](https://dimagent.cn) | `sudo pacman -S dimagent-bin` | DimAgent desktop client — AI coding agent |
+| [`leigod-plugin-bin`](https://github.com/Husky0c/leigod-plugin-linux) | `sudo pacman -S leigod-plugin-bin` | Leigod Accelerator SteamDeck plugin compatibility layer for x86_64 Linux |
 
 ## Q&A
 
