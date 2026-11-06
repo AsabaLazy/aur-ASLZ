@@ -6,15 +6,19 @@ post_install() {
   echo "==> WebUI Control Panel: http://127.0.0.1:8088"
 }
 
+pre_upgrade() {
+  if command -v systemctl >/dev/null 2>&1; then
+    systemctl stop leigod_plugin.service 2>/dev/null || true
+  fi
+}
+
 post_upgrade() {
   if [ ! -e /home/leigod ] || [ -L /home/leigod ]; then
     ln -sfn /opt/leigod /home/leigod
   fi
   if command -v systemctl >/dev/null 2>&1; then
     systemctl daemon-reload 2>/dev/null || true
-    if systemctl is-active --quiet leigod_plugin.service 2>/dev/null; then
-      systemctl restart leigod_plugin.service 2>/dev/null || true
-    fi
+    systemctl start leigod_plugin.service 2>/dev/null || true
     if systemctl is-active --quiet leigod_webui.service 2>/dev/null; then
       systemctl restart leigod_webui.service 2>/dev/null || true
     fi
