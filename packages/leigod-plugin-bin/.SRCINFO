@@ -22,11 +22,11 @@ pkgbase = leigod-plugin-bin
 	backup = opt/leigod/config/accelerator.ini
 	backup = opt/leigod/config/acc_version.ini
 	backup = opt/leigod/config/new_upgrade_conf.json
-	source_x86_64 = leigod-plugin-bin-1.3.0.02-7d953def4e473a5ecff8890dd8362c9c3ffa3a76.tar.gz::https://github.com/AsabaLazy/leigod-plugin-linux/archive/7d953def4e473a5ecff8890dd8362c9c3ffa3a76.tar.gz
+	source_x86_64 = leigod-plugin-bin-1.3.0.02-554030b1921490e2fddedd891b720ab36cb7a350.tar.gz::https://github.com/AsabaLazy/leigod-plugin-linux/archive/554030b1921490e2fddedd891b720ab36cb7a350.tar.gz
 	source_x86_64 = acc-gw.router.amd64-1.3.0.02::http://119.3.40.126/acc-gw.router.amd64
 	source_x86_64 = ipdatacloud_country.xdb-1.3.0.02::http://119.3.40.126/ipdatacloud_country.xdb
-	sha256sums_x86_64 = 03eaa9643e9bf55ed51533a9341503d5b810b09c8eb2ebfd074f0f7ec962e101
-	sha256sums_x86_64 = 3640d47abaee4a6b4312e3489137311ab309d27dcb92ab640c0fe3d953328c1b
-	sha256sums_x86_64 = 3536000ee9eb3997538cb37a14f90d571979734c48b23b8d548eceac16666273
+	sha256sums_x86_64 = 20945251a986b3c86c7c64a28766b3e30700411917ed7cf61e4189f1a333e5e1
+	sha256sums_x86_64 = 20945251a986b3c86c7c64a28766b3e30700411917ed7cf61e4189f1a333e5e1
+	sha256sums_x86_64 = 20945251a986b3c86c7c64a28766b3e30700411917ed7cf61e4189f1a333e5e1
 
 pkgname = leigod-plugin-bin
