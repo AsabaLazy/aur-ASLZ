@@ -1,8 +1,8 @@
 # Maintainer: AsabaLazy <https://github.com/AsabaLazy/aur-ASLZ>
 pkgname=leigod-plugin-bin
 pkgver=1.3.0.02
-pkgrel=20
-_commit=3f05d4ce0aeb801d31b15aeb539d1eb77bf41310
+pkgrel=21
+_commit=9913be08ee1c6d22ebdb21dfb29aa2463bf246c0
 pkgdesc="Leigod Accelerator SteamDeck plugin compatibility layer & WebUI for x86_64 Linux"
 arch=('x86_64')
 url="https://github.com/AsabaLazy/leigod-plugin-linux"
@@ -23,7 +23,7 @@ source_x86_64=(
   "ipdatacloud_country.xdb-${pkgver}::http://119.3.40.126/ipdatacloud_country.xdb"
 )
 sha256sums_x86_64=(
-  '5dd82833fd707fe39538a4902339529be401d40d98599cf7b4545c06fae0a92f'
+  '83bd756d3b89df87a8f60f2160466ebf81a798a418a2cc7761d185f02a16cf97'
   '3640d47abaee4a6b4312e3489137311ab309d27dcb92ab640c0fe3d953328c1b'
   '3536000ee9eb3997538cb37a14f90d571979734c48b23b8d548eceac16666273'
 )
