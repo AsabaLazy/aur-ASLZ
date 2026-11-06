@@ -1,7 +1,7 @@
 pkgbase = leigod-plugin-bin
 	pkgdesc = Leigod Accelerator SteamDeck plugin compatibility layer & WebUI for x86_64 Linux
 	pkgver = 1.3.0.02
-	pkgrel = 18
+	pkgrel = 19
 	url = https://github.com/AsabaLazy/leigod-plugin-linux
 	install = leigod-plugin-bin.install
 	arch = x86_64
@@ -22,10 +22,10 @@ pkgbase = leigod-plugin-bin
 	backup = opt/leigod/config/accelerator.ini
 	backup = opt/leigod/config/acc_version.ini
 	backup = opt/leigod/config/new_upgrade_conf.json
-	source_x86_64 = leigod-plugin-bin-1.3.0.02-94d9f4fafea1552fe0d7db7f4715ad2ff7cad6ab.tar.gz::https://github.com/AsabaLazy/leigod-plugin-linux/archive/94d9f4fafea1552fe0d7db7f4715ad2ff7cad6ab.tar.gz
+	source_x86_64 = leigod-plugin-bin-1.3.0.02-3f05d4ce0aeb801d31b15aeb539d1eb77bf41310.tar.gz::https://github.com/AsabaLazy/leigod-plugin-linux/archive/3f05d4ce0aeb801d31b15aeb539d1eb77bf41310.tar.gz
 	source_x86_64 = acc-gw.router.amd64-1.3.0.02::http://119.3.40.126/acc-gw.router.amd64
 	source_x86_64 = ipdatacloud_country.xdb-1.3.0.02::http://119.3.40.126/ipdatacloud_country.xdb
-	sha256sums_x86_64 = fb32fc48b08e0c5558959077ebb2c3c78069ce1a05ea8b3e0b11fa305a77ec64
+	sha256sums_x86_64 = 5dd82833fd707fe39538a4902339529be401d40d98599cf7b4545c06fae0a92f
 	sha256sums_x86_64 = 3640d47abaee4a6b4312e3489137311ab309d27dcb92ab640c0fe3d953328c1b
 	sha256sums_x86_64 = 3536000ee9eb3997538cb37a14f90d571979734c48b23b8d548eceac16666273
 
