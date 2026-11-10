@@ -1,0 +1,21 @@
+pkgbase = gopeed-bin
+	pkgdesc = High speed downloader that supports all platforms (official prebuilt binary)
+	pkgver = 1.9.3
+	pkgrel = 1
+	url = https://gopeed.com
+	arch = x86_64
+	license = GPL-3.0-only
+	depends = gtk3
+	depends = libdbusmenu-glib
+	depends = libayatana-appindicator
+	depends = libayatana-indicator
+	depends = ayatana-ido
+	depends = libkeybinder3
+	provides = gopeed
+	conflicts = gopeed
+	options = !debug
+	options = !strip
+	source_x86_64 = gopeed-1.9.3.deb::https://github.com/GopeedLab/gopeed/releases/download/v1.9.3/Gopeed-v1.9.3-linux-amd64.deb
+	sha256sums_x86_64 = 23d7caa11877ad0a21d6f1a8f1e00e23606ccf9fe2953a3d045046a2950946e5
+
+pkgname = gopeed-bin
