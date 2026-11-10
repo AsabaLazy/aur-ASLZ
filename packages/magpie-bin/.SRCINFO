@@ -1,6 +1,6 @@
 pkgbase = magpie-bin
 	pkgdesc = Every agent's model. One place. Codex on DeepSeek, Claude Code on Kimi, from menu bar
-	pkgver = 0.1.3654
+	pkgver = 0.1.3656
 	pkgrel = 1
 	url = https://github.com/yetone/magpie
 	arch = x86_64
@@ -16,10 +16,10 @@ pkgbase = magpie-bin
 	conflicts = magpie
 	options = !debug
 	options = !strip
-	source_x86_64 = magpie-0.1.3654::https://github.com/yetone/magpie/releases/download/v0.1.3654/magpie-linux-amd64
+	source_x86_64 = magpie-0.1.3656::https://github.com/yetone/magpie/releases/download/v0.1.3656/magpie-linux-amd64
 	source_x86_64 = magpie.desktop
 	source_x86_64 = magpie.png
-	sha256sums_x86_64 = 9477c35ef2a2ccb5923e5efe789847740e6fd2b998ddd7521fbd22609f538497
+	sha256sums_x86_64 = 83d51a06f51586d09eab3dee27ff63a68c8d8fb0c0c362dc4cc760ef3f57d189
 	sha256sums_x86_64 = 7e8ad08b3ab30057e7f05a66a62d8cec9fe384be5ec68558f8bfbd3ec819df9f
 	sha256sums_x86_64 = 57437c6596e05a8fcfc42d4288c030aa00ed86b69fe35d464d69d7026150c704
 
