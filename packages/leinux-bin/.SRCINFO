@@ -1,7 +1,7 @@
 pkgbase = leinux-bin
 	pkgdesc = Leinux — Native GTK4 GUI, CLI & routing daemon for Leigod Accelerator on Linux
 	pkgver = 1.3.0.02
-	pkgrel = 20
+	pkgrel = 21
 	url = https://github.com/AsabaLazy/Leinux
 	install = leinux-bin.install
 	arch = x86_64
@@ -29,10 +29,10 @@ pkgbase = leinux-bin
 	backup = opt/leigod/config/accelerator.ini
 	backup = opt/leigod/config/acc_version.ini
 	backup = opt/leigod/config/new_upgrade_conf.json
-	source_x86_64 = leinux-bin-1.3.0.02-2716b472afb0eda205f6757170348193a52132b4.tar.gz::https://github.com/AsabaLazy/Leinux/archive/2716b472afb0eda205f6757170348193a52132b4.tar.gz
+	source_x86_64 = leinux-bin-1.3.0.02-43bb8cd845f41de4b0a5dec8e9cec96d649ce2ff.tar.gz::https://github.com/AsabaLazy/Leinux/archive/43bb8cd845f41de4b0a5dec8e9cec96d649ce2ff.tar.gz
 	source_x86_64 = acc-gw.router.amd64-1.3.0.02::http://119.3.40.126/acc-gw.router.amd64
 	source_x86_64 = ipdatacloud_country.xdb-1.3.0.02::http://119.3.40.126/ipdatacloud_country.xdb
-	sha256sums_x86_64 = 6ada8526b54553d6c4cf72e908c972bbee131b545730cdc4b2fe8e1b3893d1d7
+	sha256sums_x86_64 = 3e140cc7dbec4c24f366cb3023c3cb89ee69869b8863dfad7872bccf8ae752c3
 	sha256sums_x86_64 = 3640d47abaee4a6b4312e3489137311ab309d27dcb92ab640c0fe3d953328c1b
 	sha256sums_x86_64 = 3536000ee9eb3997538cb37a14f90d571979734c48b23b8d548eceac16666273
 
