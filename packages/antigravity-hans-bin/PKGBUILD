@@ -1,0 +1,67 @@
+# Maintainer: AsabaLazy
+
+pkgname=antigravity-hans-bin
+pkgver=2.31.0
+pkgrel=1
+# execution_id from the official /releases feed
+_build=6379060755038208
+# commit of antigravity-hans-overlay.js from yuexps/Antigravity-Hans
+_hans_commit=2ee19cfd6f1f2dd97bca82a0f7efa5ff102399a4
+pkgdesc='Google Antigravity agentic development platform (prebuilt desktop client with Simplified Chinese localization)'
+arch=('x86_64')
+url='https://github.com/yuexps/Antigravity-Hans'
+license=('LicenseRef-Google-Antigravity' 'GPL-3.0-only')
+provides=('antigravity' 'antigravity-bin')
+conflicts=('antigravity' 'antigravity-bin')
+depends=('alsa-lib'
+         'at-spi2-core'
+         'cairo'
+         'dbus'
+         'expat'
+         'glib2'
+         'glibc'
+         'gtk3'
+         'libcups'
+         'libgcc'
+         'libx11'
+         'libxcb'
+         'libxcomposite'
+         'libxdamage'
+         'libxext'
+         'libxfixes'
+         'libxkbcommon'
+         'libxrandr'
+         'mesa'
+         'nspr'
+         'nss'
+         'pango'
+         'systemd-libs')
+makedepends=('python')
+options=('!debug' '!strip')
+source=('antigravity.desktop'
+        'antigravity.png')
+source_x86_64=("${pkgname}-${pkgver}.tar.gz::https://storage.googleapis.com/antigravity-public/antigravity-hub/2.31.0-6379060755038208/linux-x64/Antigravity.tar.gz"
+               "antigravity-hans-overlay-${_hans_commit}.js::https://raw.githubusercontent.com/yuexps/Antigravity-Hans/${_hans_commit}/antigravity-hans-overlay.js")
+sha256sums=('b73a53109cd82c5c16fdf042a2203b2d46cd535a97442afd3c39cb506e1bf569'
+            'b27f0e4a6f14f491ba31bb24533a1f43c677362b12a0744a53fdd09d7c785317')
+sha256sums_x86_64=('30ccdea1fff0bf643b7f6e7aa493240d13ec1d866acf4f89c2a6cc3a2c33369c'
+                   'd0178b27fa0ebfcdb3b6f94d21c4e04924ae2d7d495aa726cfc413bdde59c1d7')
+
+package() {
+  install -d "${pkgdir}/opt"
+  cp -a Antigravity-*/ "${pkgdir}/opt/antigravity"
+
+  python3 "${startdir}/patch_asar.py" \
+    "${pkgdir}/opt/antigravity/resources/app.asar" \
+    "${srcdir}/antigravity-hans-overlay-${_hans_commit}.js"
+
+  install -d "${pkgdir}/usr/bin"
+  ln -s /opt/antigravity/antigravity "${pkgdir}/usr/bin/antigravity"
+
+  install -d "${pkgdir}/usr/share/licenses/${pkgname}"
+  ln -s /opt/antigravity/LICENSE.electron.txt "${pkgdir}/usr/share/licenses/${pkgname}/"
+  ln -s /opt/antigravity/LICENSES.chromium.html "${pkgdir}/usr/share/licenses/${pkgname}/"
+
+  install -Dm644 antigravity.desktop "${pkgdir}/usr/share/applications/antigravity.desktop"
+  install -Dm644 antigravity.png "${pkgdir}/usr/share/icons/hicolor/512x512/apps/antigravity.png"
+}
