@@ -27,6 +27,7 @@ post_upgrade() {
   rm -rf /opt/leigod/webui 2>/dev/null || true
   if command -v systemctl >/dev/null 2>&1; then
     systemctl daemon-reload 2>/dev/null || true
+    systemctl reset-failed leinux-core.service leinux.service 2>/dev/null || true
     systemctl enable --now leinux-core.service leinux.service 2>/dev/null || true
   fi
 }
