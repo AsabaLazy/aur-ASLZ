@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=magpie
+Comment=Every agent's model. One place.
+Exec=/usr/bin/magpie app
+Icon=magpie
+Categories=Development;Utility;
+Terminal=false
