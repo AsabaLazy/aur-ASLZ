@@ -36,18 +36,18 @@ sudo pacman -Sy
 
 | 软件包 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; | 安装命令 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; |
 | :--- | :--- |
-| [`astrlink-bin`](https://github.com/Calcium-Ion/AstrLink) | `sudo pacman -S astrlink-bin` |
-| [`magpie-bin`](https://github.com/yetone/magpie) | `sudo pacman -S magpie-bin` |
-| [`gopeed-bin`](https://github.com/GopeedLab/gopeed) | `sudo pacman -S gopeed-bin` |
-| [`gopeed-fluent-bin`](https://github.com/AsabaLazy/gopeed-fluent) | `sudo pacman -S gopeed-fluent-bin` |
-| [`novelmikuer-bin`](https://github.com/AsabaLazy/NovelMikuer) | `sudo pacman -S novelmikuer-bin` |
+| [`antigravity-bin`](https://antigravity.google/) | `sudo pacman -S antigravity-bin` |
+| [`antigravity-cli-512k-bin`](https://github.com/google-antigravity/antigravity-cli) | `sudo pacman -S antigravity-cli-512k-bin` |
 | [`antigravity-cli-bin`](https://github.com/google-antigravity/antigravity-cli) | `sudo pacman -S antigravity-cli-bin` |
 | [`antigravity-cli-fix-bin`](https://github.com/google-antigravity/antigravity-cli) | `sudo pacman -S antigravity-cli-fix-bin` |
-| [`antigravity-cli-512k-bin`](https://github.com/google-antigravity/antigravity-cli) | `sudo pacman -S antigravity-cli-512k-bin` |
-| [`antigravity-bin`](https://antigravity.google/) | `sudo pacman -S antigravity-bin` |
 | [`antigravity-hans-bin`](https://github.com/yuexps/Antigravity-Hans) | `sudo pacman -S antigravity-hans-bin` |
+| [`astrlink-bin`](https://github.com/Calcium-Ion/AstrLink) | `sudo pacman -S astrlink-bin` |
 | [`dimagent-bin`](https://dimagent.cn) | `sudo pacman -S dimagent-bin` |
+| [`gopeed-bin`](https://github.com/GopeedLab/gopeed) | `sudo pacman -S gopeed-bin` |
+| [`gopeed-fluent-bin`](https://github.com/AsabaLazy/gopeed-fluent) | `sudo pacman -S gopeed-fluent-bin` |
 | [`leinux-bin`](https://github.com/AsabaLazy/Leinux) | `sudo pacman -S leinux-bin` |
+| [`magpie-bin`](https://github.com/yetone/magpie) | `sudo pacman -S magpie-bin` |
+| [`novelmikuer-bin`](https://github.com/AsabaLazy/NovelMikuer) | `sudo pacman -S novelmikuer-bin` |
 
 ## Q&A
 

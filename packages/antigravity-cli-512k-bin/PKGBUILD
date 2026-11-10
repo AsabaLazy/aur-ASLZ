@@ -16,5 +16,5 @@ sha256sums_x86_64=('bfe2c25edeadd98c2942417c9972ee0e1faa3f0afdc90711e84d5f3a633b
 
 package() {
   install -Dm755 "${srcdir}/antigravity" "${pkgdir}/usr/bin/agy"
-  python3 "${startdir}/patch_agy.py" "${pkgdir}/usr/bin/agy"
+  python3 "${startdir}/patch_agy.py" --clamp=512k "${pkgdir}/usr/bin/agy"
 }

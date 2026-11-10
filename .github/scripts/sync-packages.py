@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Auto-discover and synchronize Arch binary packages from self-describing PKGBUILDs."""
+"""Auto-discover and synchronize Arch binary packages and README tables from self-describing PKGBUILDs."""
 
 from __future__ import annotations
 
@@ -17,9 +17,10 @@ from typing import Any, Callable, Literal, TypeVar
 import urllib.request
 
 PACKAGES_DIR = Path("packages")
+README_FILES = (Path("README.md"), Path("README_zh.md"))
 HTTP_TIMEOUT = 30
 CHUNK_SIZE = 65536
-USER_AGENT = "aur-aslz-sync/3.0"
+USER_AGENT = "aur-aslz-sync/3.1"
 REQUIRED_DB_ASSETS = frozenset({"aslz.db", "aslz.db.tar.gz", "aslz.files", "aslz.files.tar.gz"})
 
 GH_RELEASE_URL_RE = re.compile(r"^https://github\.com/([^/]+/[^/]+)/releases/download/[^/]+/(.+)$")
@@ -31,8 +32,8 @@ ASSET_VER_TOKEN_RE = re.compile(
 MANIFEST_BUILD_RE = re.compile(r"/[0-9.]+-([0-9]+)/")
 YAML_VERSION_RE = re.compile(r"^version:\s*(.+)", re.MULTILINE)
 INI_VERSION_RE = re.compile(r"^(?:version|UPSTREAM_VERSION)=(.+)", re.MULTILINE)
-BINARY_VERSION_RE = re.compile(rb"ipPortProtocolReport\x00([0-9]+(?:\.[0-9]+)+)\x00")
 PKG_ASSET_RE = re.compile(r"^(.+)-[^-]+-[^-]+-[^-]+\.pkg\.tar\.zst$")
+README_TABLE_RE = re.compile(r"(^\| :--- \| :--- \|\n)(?:\|.*\n)+", re.MULTILINE)
 
 T = TypeVar("T")
 Status = Literal["OK", "UPDATE", "SKIP", "ERROR"]
@@ -67,6 +68,7 @@ class CommitHybridSpec:
     name: str
     upstream: str
     companion_urls: tuple[str, ...]
+    version_regex: str | None = None
     version_ini_path: str | None = None
 
 
@@ -185,12 +187,11 @@ class Pkgbuild:
                         raw = raw.replace(f"${{{k}}}", val).replace(f"${k}", val)
                 entries.extend(tok.strip("'\"") for tok in re.findall(r"""['"][^'"]+['"]|\S+""", raw))
 
-        urls: list[str] = []
-        for entry in entries:
-            target = entry.split("::", 1)[-1]
-            if target.startswith(("https://", "http://")):
-                urls.append(target)
-        return urls
+        return [
+            target
+            for entry in entries
+            if (target := entry.split("::", 1)[-1]).startswith(("https://", "http://"))
+        ]
 
     def set_var(self, key: str, value: str) -> None:
         self.text = re.sub(rf"^{re.escape(key)}=.*", f"{key}={value}", self.text, count=1, flags=re.MULTILINE)
@@ -222,9 +223,7 @@ def derive_asset_pattern(filename: str) -> str:
     m = ASSET_VER_TOKEN_RE.search(filename)
     if not m:
         return f"^{re.escape(filename)}$"
-    prefix = re.escape(filename[: m.start()])
-    suffix = re.escape(filename[m.end() :])
-    return f"^{prefix}.*{suffix}$"
+    return f"^{re.escape(filename[: m.start()])}.*{re.escape(filename[m.end() :])}$"
 
 
 def discover_package(pb: Pkgbuild) -> PackageSpec | None:
@@ -252,7 +251,13 @@ def discover_package(pb: Pkgbuild) -> PackageSpec | None:
         return ManifestReleaseSpec(pb.name, manifest_url, tpl)
 
     if arch_m := GH_ARCHIVE_URL_RE.match(primary):
-        return CommitHybridSpec(pb.name, arch_m.group(1), tuple(urls[1:]), pb.get("_version_ini"))
+        return CommitHybridSpec(
+            pb.name,
+            arch_m.group(1),
+            tuple(urls[1:]),
+            pb.get("_version_regex"),
+            pb.get("_version_ini"),
+        )
 
     if gh_m := GH_RELEASE_URL_RE.match(primary):
         pattern = pb.get("_asset_pattern") or derive_asset_pattern(gh_m.group(2))
@@ -272,6 +277,32 @@ def discover_packages() -> list[tuple[Pkgbuild, PackageSpec]]:
         if spec := discover_package(pb):
             discovered.append((pb, spec))
     return discovered
+
+
+def sync_readmes(entries: list[tuple[Pkgbuild, PackageSpec]]) -> bool:
+    rows: list[str] = []
+    for pb, spec in entries:
+        pkgname = pb.get("pkgname") or pb.name
+        if isinstance(spec, (GithubReleaseSpec, CommitHybridSpec)):
+            link = f"https://github.com/{spec.upstream}"
+        else:
+            link = pb.get("url") or f"https://github.com/AsabaLazy/aur-ASLZ/tree/main/packages/{pb.name}"
+        rows.append(f"| [`{pkgname}`]({link}) | `sudo pacman -S {pkgname}` |")
+
+    if not rows:
+        return False
+
+    table_body = "\n".join(rows) + "\n"
+    changed = False
+    for path in README_FILES:
+        if not path.is_file():
+            continue
+        original = path.read_text(encoding="utf-8")
+        updated = README_TABLE_RE.sub(rf"\1{table_body}", original, count=1)
+        if updated != original:
+            path.write_text(updated, encoding="utf-8")
+            changed = True
+    return changed
 
 
 def resolve_feed_release(feed_url: str, manifest_url: str | None) -> tuple[str, str]:
@@ -313,15 +344,19 @@ def resolve_overlay_commit(repo: str, path: str) -> str:
     return once(f"overlay:{repo}:{path}", _probe)
 
 
-def resolve_github_sha256(upstream: str, tag: str, asset_name: str, download_url: str) -> str:
+def resolve_github_sha256(asset: dict[str, Any], upstream: str, tag: str) -> str:
+    digest = str(asset.get("digest") or "")
+    if digest.startswith("sha256:"):
+        return digest.removeprefix("sha256:")
+
+    url, name = str(asset["browser_download_url"]), str(asset["name"])
     try:
-        sums = fetch_text(f"https://github.com/{upstream}/releases/download/{tag}/SHA256SUMS")
-        for line in sums.splitlines():
-            if asset_name in line:
+        for line in fetch_text(f"https://github.com/{upstream}/releases/download/{tag}/SHA256SUMS").splitlines():
+            if name in line:
                 return line.split()[0]
     except Exception:
         pass
-    return sha256_url(download_url)
+    return sha256_url(url)
 
 
 def sync_github(pkg: GithubReleaseSpec, pb: Pkgbuild, force: bool) -> SyncResult:
@@ -341,7 +376,7 @@ def sync_github(pkg: GithubReleaseSpec, pb: Pkgbuild, force: bool) -> SyncResult
 
     url = str(asset["browser_download_url"])
     pb.set_version(version)
-    pb.set_primary_sum(resolve_github_sha256(pkg.upstream, tag, str(asset["name"]), url))
+    pb.set_primary_sum(resolve_github_sha256(asset, pkg.upstream, tag))
     pb.set_url(url)
     pb.save()
     return SyncResult(pkg.name, "UPDATE", f"{cur_ver} -> {tag}")
@@ -397,16 +432,21 @@ def sync_manifest(pkg: ManifestReleaseSpec, pb: Pkgbuild, force: bool) -> SyncRe
 def sync_commit_hybrid(pkg: CommitHybridSpec, pb: Pkgbuild, force: bool) -> SyncResult:
     with ThreadPoolExecutor(max_workers=1 + len(pkg.companion_urls)) as pool:
         commit_fut = pool.submit(fetch_json, f"https://api.github.com/repos/{pkg.upstream}/commits/main")
-        first_bin_fut = pool.submit(fetch_bytes, pkg.companion_urls[0]) if pkg.companion_urls else None
-        extra_futs = [pool.submit(sha256_url, u) for u in pkg.companion_urls[1:]]
+        first_bin_fut = (
+            pool.submit(fetch_bytes, pkg.companion_urls[0])
+            if pkg.companion_urls and pkg.version_regex
+            else None
+        )
+        stream_urls = pkg.companion_urls[1:] if first_bin_fut else pkg.companion_urls
+        stream_futs = [pool.submit(sha256_url, u) for u in stream_urls]
 
         commit = str(commit_fut.result()["sha"])
         first_bytes = first_bin_fut.result() if first_bin_fut else b""
         companion_sums = ([hashlib.sha256(first_bytes).hexdigest()] if first_bin_fut else []) + [
-            f.result() for f in extra_futs
+            f.result() for f in stream_futs
         ]
 
-    ver_m = BINARY_VERSION_RE.search(first_bytes)
+    ver_m = re.search(pkg.version_regex.encode("ascii"), first_bytes) if pkg.version_regex and first_bytes else None
     if ver_m:
         version = ver_m.group(1).decode("ascii")
     elif pkg.version_ini_path:
@@ -528,6 +568,7 @@ def main() -> None:
     repo = os.environ.get("GITHUB_REPOSITORY", "AsabaLazy/aur-ASLZ")
     force = os.environ.get("FORCE_BUILD", "false").lower() == "true"
     entries = discover_packages()
+    readme_changed = sync_readmes(entries)
 
     with ThreadPoolExecutor(max_workers=8) as pool:
         assets_fut = pool.submit(get_release_assets, repo)
@@ -539,10 +580,11 @@ def main() -> None:
 
     updated_pkgs = {r.name for r in results if r.updated}
     state = inspect_repo_state(release_assets, updated_pkgs, force)
-    skip = not updated_pkgs and not state.drift and not force
+    skip = not updated_pkgs and not readme_changed and not state.drift and not force
 
     print(
         f"\nSummary: {len(entries)} discovered, {len(updated_pkgs)} updated, "
+        f"readme synced: {readme_changed}, "
         f"{len(state.build_pkgs)} to build ({', '.join(state.build_pkgs) or 'none'}), "
         f"obsolete: {len(state.obsolete_assets)}, skip: {skip}"
     )

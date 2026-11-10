@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Patch Google Antigravity CLI (agy) to unlock 900K context window and remove 256K compaction clamp."""
+"""Patch Google Antigravity CLI (agy) to unlock context window selection and adjust compaction clamp."""
 
 from __future__ import annotations
 
+import argparse
 from pathlib import Path
 import struct
-import sys
 
 GO_SYMBOLS = {
     "offersContextWindow": "google3/third_party/jetski/cli/model/model.SelectorModel.offersContextWindow",
@@ -18,7 +18,10 @@ OFFERS_TRUE_PATCH = bytes.fromhex("b001c3")  # mov $1, %al; ret
 PROLOGUES = (bytes.fromhex("4989e4"), bytes.fromhex("554889e5"))
 CHOICE_ANCHOR = bytes.fromhex("493b66107627554889e54883ec10488b48104885c9")
 CLAMP_256K_PAT = bytes.fromhex("81fa00e80300be00e803000f42f2")
-CLAMP_PATCH = bytes.fromhex("89d6909090909090909090909090")  # mov %edx, %esi; nop... (unclamped)
+CLAMP_PATCHES = {
+    "none": bytes.fromhex("89d6909090909090909090909090"),  # mov %edx, %esi; nop... (unclamped 900K)
+    "512k": bytes.fromhex("81fa00d00700be00d007000f42f2"),  # raise 256,000 -> 512,000 ceiling
+}
 
 
 def find_elf_text_offset(data: bytes) -> int:
@@ -77,12 +80,11 @@ def resolve_go_symbols(data: bytes, targets: set[str]) -> dict[str, tuple[int, i
     return resolved
 
 
-def patch_binary(binary_path: Path, *, dry_run: bool = False) -> None:
-    print(f"Target binary: {binary_path}")
+def patch_binary(binary_path: Path, *, clamp: str, dry_run: bool = False) -> None:
+    print(f"Target binary: {binary_path} (clamp={clamp})")
     data = bytearray(binary_path.read_bytes())
     symbols = resolve_go_symbols(data, set(GO_SYMBOLS.values()))
-    missing = [k for k, sym in GO_SYMBOLS.items() if sym not in symbols]
-    if missing:
+    if missing := [k for k, sym in GO_SYMBOLS.items() if sym not in symbols]:
         raise RuntimeError(f"missing required Go symbols: {', '.join(missing)}")
 
     modified = False
@@ -111,17 +113,18 @@ def patch_binary(binary_path: Path, *, dry_run: bool = False) -> None:
         modified = True
         print(f"  Patched Store.ContextWindow -> ContextWindowChoice at {hex(cw_entry)}")
 
-    # 3. Remove 256K checkpoint compaction clamp in GetCheckpointConfig
+    # 3. Adjust 256K checkpoint compaction clamp in GetCheckpointConfig
+    target_clamp = CLAMP_PATCHES[clamp]
     chk_off, chk_size = symbols[GO_SYMBOLS["GetCheckpointConfig"]]
     chk_slice = data[chk_off : chk_off + chk_size]
-    if CLAMP_PATCH not in chk_slice:
+    if target_clamp not in chk_slice:
         rel_idx = chk_slice.find(CLAMP_256K_PAT)
         if rel_idx == -1:
             raise RuntimeError("256K clamp pattern not found in GetCheckpointConfig")
         clamp_addr = chk_off + rel_idx
-        data[clamp_addr : clamp_addr + len(CLAMP_PATCH)] = CLAMP_PATCH
+        data[clamp_addr : clamp_addr + len(target_clamp)] = target_clamp
         modified = True
-        print(f"  Removed 256K compaction clamp at {hex(clamp_addr)}")
+        print(f"  Updated compaction clamp ({clamp}) at {hex(clamp_addr)}")
 
     if dry_run or not modified:
         print("  Dry run complete." if dry_run else "  Binary already patched.")
@@ -135,12 +138,12 @@ def patch_binary(binary_path: Path, *, dry_run: bool = False) -> None:
 
 
 def main() -> None:
-    dry_run = "--dry-run" in sys.argv[1:]
-    args = [a for a in sys.argv[1:] if a != "--dry-run"]
-    if len(args) != 1:
-        print(f"Usage: {sys.argv[0]} [--dry-run] <path/to/agy>", file=sys.stderr)
-        sys.exit(1)
-    patch_binary(Path(args[0]), dry_run=dry_run)
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("binary", type=Path, help="Path to agy ELF binary")
+    parser.add_argument("--clamp", choices=tuple(CLAMP_PATCHES), default="none", help="Compaction ceiling mode")
+    parser.add_argument("--dry-run", action="store_true", help="Verify symbols and patterns without writing")
+    args = parser.parse_args()
+    patch_binary(args.binary, clamp=args.clamp, dry_run=args.dry_run)
 
 
 if __name__ == "__main__":
