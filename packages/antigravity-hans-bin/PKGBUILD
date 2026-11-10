@@ -2,11 +2,11 @@
 
 pkgname=antigravity-hans-bin
 pkgver=2.31.0
-pkgrel=1
+pkgrel=2
 # execution_id from the official /releases feed
 _build=6379060755038208
 # commit of antigravity-hans-overlay.js from yuexps/Antigravity-Hans
-_hans_commit=2ee19cfd6f1f2dd97bca82a0f7efa5ff102399a4
+_hans_commit=77f57a2ead122d40e0899db0ea795972fb022dca
 pkgdesc='Google Antigravity agentic development platform (prebuilt desktop client with Simplified Chinese localization)'
 arch=('x86_64')
 url='https://github.com/yuexps/Antigravity-Hans'
@@ -45,7 +45,7 @@ source_x86_64=("${pkgname}-${pkgver}.tar.gz::https://storage.googleapis.com/anti
 sha256sums=('b73a53109cd82c5c16fdf042a2203b2d46cd535a97442afd3c39cb506e1bf569'
             'b27f0e4a6f14f491ba31bb24533a1f43c677362b12a0744a53fdd09d7c785317')
 sha256sums_x86_64=('30ccdea1fff0bf643b7f6e7aa493240d13ec1d866acf4f89c2a6cc3a2c33369c'
-                   'd0178b27fa0ebfcdb3b6f94d21c4e04924ae2d7d495aa726cfc413bdde59c1d7')
+                   'b2b40c2a4cb0e73e37dece8e35ca27475dd0116168880f95b1ae1a1f86ed0538')
 
 package() {
   install -d "${pkgdir}/opt"
