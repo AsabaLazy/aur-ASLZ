@@ -2,6 +2,7 @@
 pkgname=dimagent-bin
 pkgver=0.9.62
 pkgrel=1
+_manifest_url="https://dimcode.echooai.com/updates/stable/linux/x64/latest-linux.yml"
 pkgdesc="DimAgent desktop client — AI coding agent"
 arch=('x86_64')
 url="https://dimagent.cn"

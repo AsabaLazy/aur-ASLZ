@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Synchronize upstream binary releases with local PKGBUILDs and GitHub Releases."""
+"""Auto-discover and synchronize Arch binary packages from self-describing PKGBUILDs."""
 
 from __future__ import annotations
 
@@ -19,20 +19,16 @@ import urllib.request
 PACKAGES_DIR = Path("packages")
 HTTP_TIMEOUT = 30
 CHUNK_SIZE = 65536
-USER_AGENT = "aur-aslz-sync/2.1"
+USER_AGENT = "aur-aslz-sync/3.0"
 REQUIRED_DB_ASSETS = frozenset({"aslz.db", "aslz.db.tar.gz", "aslz.files", "aslz.files.tar.gz"})
 
-AGY_FEED_URL = "https://antigravity-hub-auto-updater-974169037036.us-central1.run.app/releases"
-AGY_MANIFEST_URL = (
-    "https://antigravity-hub-auto-updater-974169037036.us-central1.run.app/manifest/latest-x64-linux.yml"
+GH_RELEASE_URL_RE = re.compile(r"^https://github\.com/([^/]+/[^/]+)/releases/download/[^/]+/(.+)$")
+GH_ARCHIVE_URL_RE = re.compile(r"^https://github\.com/([^/]+/[^/]+)/archive/[0-9a-f]{40}\.tar\.gz$")
+GH_RAW_COMMIT_URL_RE = re.compile(r"^https://raw\.githubusercontent\.com/([^/]+/[^/]+)/[0-9a-f]{40}/(.+)$")
+ASSET_VER_TOKEN_RE = re.compile(
+    r"v?\d+\.\d+[0-9A-Za-z._-]*?(?=[._-](?:linux|amd64|x86_64|x64)|\.(?:deb|tar\.|AppImage|zip))"
 )
-AGY_PAGE_URL = "https://antigravity.google/download"
-AGY_DOWNLOAD_TPL = (
-    "https://storage.googleapis.com/antigravity-public/antigravity-hub/{version}-{build}/linux-x64/Antigravity.tar.gz"
-)
-
-AGY_MANIFEST_BUILD_RE = re.compile(r"antigravity-hub/[0-9.]+-([0-9]+)/")
-AGY_PAGE_ARTIFACT_RE = re.compile(r"antigravity-hub/([0-9.]+)-([0-9]+)/linux-x64/Antigravity\.tar\.gz")
+MANIFEST_BUILD_RE = re.compile(r"/[0-9.]+-([0-9]+)/")
 YAML_VERSION_RE = re.compile(r"^version:\s*(.+)", re.MULTILINE)
 INI_VERSION_RE = re.compile(r"^(?:version|UPSTREAM_VERSION)=(.+)", re.MULTILINE)
 BINARY_VERSION_RE = re.compile(rb"ipPortProtocolReport\x00([0-9]+(?:\.[0-9]+)+)\x00")
@@ -43,65 +39,38 @@ Status = Literal["OK", "UPDATE", "SKIP", "ERROR"]
 
 
 @dataclass(frozen=True, slots=True)
-class GithubRelease:
+class GithubReleaseSpec:
     name: str
     upstream: str
     asset_pattern: str
 
 
 @dataclass(frozen=True, slots=True)
-class AntigravityFeed:
+class FeedReleaseSpec:
     name: str
+    feed_url: str
+    manifest_url: str | None
+    download_tpl: str
     overlay_repo: str | None = None
     overlay_path: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
-class ManifestRelease:
+class ManifestReleaseSpec:
     name: str
     manifest_url: str
     download_tpl: str
 
 
 @dataclass(frozen=True, slots=True)
-class LeinuxSource:
+class CommitHybridSpec:
     name: str
     upstream: str
-    version_ini_url: str
-    binary_url: str
-    xdb_url: str
+    companion_urls: tuple[str, ...]
+    version_ini_path: str | None = None
 
 
-type PackageSpec = GithubRelease | AntigravityFeed | ManifestRelease | LeinuxSource
-
-PACKAGES: tuple[PackageSpec, ...] = (
-    GithubRelease("astrlink-bin", "Calcium-Ion/AstrLink", r"AstrLink_.*_amd64\.deb"),
-    GithubRelease("magpie-bin", "yetone/magpie", r"^magpie-linux-amd64$"),
-    GithubRelease("gopeed-bin", "GopeedLab/gopeed", r"Gopeed-.*-linux-amd64\.deb"),
-    GithubRelease("gopeed-fluent-bin", "AsabaLazy/gopeed-fluent", r"Gopeed_Fluent_.*_linux_amd64\.deb"),
-    GithubRelease("novelmikuer-bin", "AsabaLazy/NovelMikuer", r"NovelMikuer_.*_amd64\.deb"),
-    GithubRelease("antigravity-cli-bin", "google-antigravity/antigravity-cli", r"^agy_cli_linux_x64\.tar\.gz$"),
-    GithubRelease("antigravity-cli-fix-bin", "google-antigravity/antigravity-cli", r"^agy_cli_linux_x64\.tar\.gz$"),
-    GithubRelease("antigravity-cli-512k-bin", "google-antigravity/antigravity-cli", r"^agy_cli_linux_x64\.tar\.gz$"),
-    AntigravityFeed("antigravity-bin"),
-    AntigravityFeed(
-        "antigravity-hans-bin",
-        overlay_repo="yuexps/Antigravity-Hans",
-        overlay_path="antigravity-hans-overlay.js",
-    ),
-    ManifestRelease(
-        "dimagent-bin",
-        manifest_url="https://dimcode.echooai.com/updates/stable/linux/x64/latest-linux.yml",
-        download_tpl="https://dimcode.echooai.com/updates/stable/linux/x64/DimAgent-{version}.deb",
-    ),
-    LeinuxSource(
-        "leinux-bin",
-        upstream="AsabaLazy/Leinux",
-        version_ini_url="https://raw.githubusercontent.com/AsabaLazy/Leinux/main/opt/leigod/config/acc_version.ini",
-        binary_url="http://119.3.40.126/acc-gw.router.amd64",
-        xdb_url="http://119.3.40.126/ipdatacloud_country.xdb",
-    ),
-)
+type PackageSpec = GithubReleaseSpec | FeedReleaseSpec | ManifestReleaseSpec | CommitHybridSpec
 
 
 @dataclass(frozen=True, slots=True)
@@ -187,7 +156,10 @@ def version_key(version: str) -> tuple[int, ...]:
 
 class Pkgbuild:
     def __init__(self, pkg_name: str) -> None:
-        self.path = PACKAGES_DIR / pkg_name / "PKGBUILD"
+        self.name = pkg_name
+        self.dir = PACKAGES_DIR / pkg_name
+        self.path = self.dir / "PKGBUILD"
+        self.srcinfo_path = self.dir / ".SRCINFO"
         self.text = self.path.read_text(encoding="utf-8") if self.path.is_file() else ""
 
     @property
@@ -197,6 +169,28 @@ class Pkgbuild:
     def get(self, key: str) -> str | None:
         m = re.search(rf"^{re.escape(key)}=(.+)", self.text, re.MULTILINE)
         return m.group(1).strip().strip("'\"") if m else None
+
+    def source_urls(self) -> list[str]:
+        entries: list[str] = []
+        if self.srcinfo_path.is_file():
+            for line in self.srcinfo_path.read_text(encoding="utf-8").splitlines():
+                if line.strip().startswith("source_x86_64 ="):
+                    entries.append(line.split("=", 1)[1].strip())
+        else:
+            m = re.search(r"source_x86_64=\(([^)]*)\)", self.text, re.DOTALL)
+            if m:
+                raw = m.group(1)
+                for k in ("pkgname", "pkgver", "url", "_commit", "_hans_commit", "_build"):
+                    if val := self.get(k):
+                        raw = raw.replace(f"${{{k}}}", val).replace(f"${k}", val)
+                entries.extend(tok.strip("'\"") for tok in re.findall(r"""['"][^'"]+['"]|\S+""", raw))
+
+        urls: list[str] = []
+        for entry in entries:
+            target = entry.split("::", 1)[-1]
+            if target.startswith(("https://", "http://")):
+                urls.append(target)
+        return urls
 
     def set_var(self, key: str, value: str) -> None:
         self.text = re.sub(rf"^{re.escape(key)}=.*", f"{key}={value}", self.text, count=1, flags=re.MULTILINE)
@@ -224,12 +218,68 @@ class Pkgbuild:
         tmp.replace(self.path)
 
 
-def resolve_antigravity_release() -> tuple[str, str]:
+def derive_asset_pattern(filename: str) -> str:
+    m = ASSET_VER_TOKEN_RE.search(filename)
+    if not m:
+        return f"^{re.escape(filename)}$"
+    prefix = re.escape(filename[: m.start()])
+    suffix = re.escape(filename[m.end() :])
+    return f"^{prefix}.*{suffix}$"
+
+
+def discover_package(pb: Pkgbuild) -> PackageSpec | None:
+    if pb.get("_sync_skip") == "true":
+        return None
+    urls = pb.source_urls()
+    if not urls:
+        return None
+
+    primary = urls[0]
+    cur_ver = pb.get("pkgver") or ""
+
+    if feed_url := pb.get("_feed_url"):
+        cur_build = pb.get("_build") or ""
+        tpl = primary.replace(f"{cur_ver}-{cur_build}", "{version}-{build}", 1)
+        overlay_repo = overlay_path = None
+        for u in urls[1:]:
+            if raw_m := GH_RAW_COMMIT_URL_RE.match(u):
+                overlay_repo, overlay_path = raw_m.group(1), raw_m.group(2)
+                break
+        return FeedReleaseSpec(pb.name, feed_url, pb.get("_manifest_url"), tpl, overlay_repo, overlay_path)
+
+    if manifest_url := pb.get("_manifest_url"):
+        tpl = primary.replace(cur_ver, "{version}", 1)
+        return ManifestReleaseSpec(pb.name, manifest_url, tpl)
+
+    if arch_m := GH_ARCHIVE_URL_RE.match(primary):
+        return CommitHybridSpec(pb.name, arch_m.group(1), tuple(urls[1:]), pb.get("_version_ini"))
+
+    if gh_m := GH_RELEASE_URL_RE.match(primary):
+        pattern = pb.get("_asset_pattern") or derive_asset_pattern(gh_m.group(2))
+        return GithubReleaseSpec(pb.name, gh_m.group(1), pattern)
+
+    return None
+
+
+def discover_packages() -> list[tuple[Pkgbuild, PackageSpec]]:
+    if not PACKAGES_DIR.is_dir():
+        return []
+    discovered: list[tuple[Pkgbuild, PackageSpec]] = []
+    for pkg_dir in sorted(PACKAGES_DIR.iterdir()):
+        if pkg_dir.name == "repo" or not (pkg_dir / "PKGBUILD").is_file():
+            continue
+        pb = Pkgbuild(pkg_dir.name)
+        if spec := discover_package(pb):
+            discovered.append((pb, spec))
+    return discovered
+
+
+def resolve_feed_release(feed_url: str, manifest_url: str | None) -> tuple[str, str]:
     def _probe() -> tuple[str, str]:
         candidates: list[tuple[str, str]] = []
 
         try:
-            feed = fetch_json(AGY_FEED_URL)
+            feed = fetch_json(feed_url)
             entry = feed[0] if isinstance(feed, list) else feed["versions"][0]
             ver, bld = str(entry.get("version", "")).strip(), str(entry.get("execution_id", "")).strip()
             if ver and bld:
@@ -237,23 +287,20 @@ def resolve_antigravity_release() -> tuple[str, str]:
         except Exception:
             pass
 
-        try:
-            manifest = fetch_text(AGY_MANIFEST_URL)
-            ver_m, bld_m = YAML_VERSION_RE.search(manifest), AGY_MANIFEST_BUILD_RE.search(manifest)
-            if ver_m and bld_m:
-                candidates.append((ver_m.group(1).strip(), bld_m.group(1)))
-        except Exception:
-            pass
+        if manifest_url:
+            try:
+                manifest = fetch_text(manifest_url)
+                ver_m, bld_m = YAML_VERSION_RE.search(manifest), MANIFEST_BUILD_RE.search(manifest)
+                if ver_m and bld_m:
+                    candidates.append((ver_m.group(1).strip(), bld_m.group(1)))
+            except Exception:
+                pass
 
-        if candidates:
-            return max(candidates, key=lambda item: version_key(item[0]))
+        if not candidates:
+            raise RuntimeError(f"unable to resolve release from {feed_url}")
+        return max(candidates, key=lambda item: version_key(item[0]))
 
-        m = AGY_PAGE_ARTIFACT_RE.search(fetch_text(AGY_PAGE_URL))
-        if not m:
-            raise RuntimeError("unable to resolve Antigravity release")
-        return m.group(1), m.group(2)
-
-    return once("antigravity_release", _probe)
+    return once(f"feed:{feed_url}:{manifest_url}", _probe)
 
 
 def resolve_overlay_commit(repo: str, path: str) -> str:
@@ -277,14 +324,7 @@ def resolve_github_sha256(upstream: str, tag: str, asset_name: str, download_url
     return sha256_url(download_url)
 
 
-def parse_ini_version(text: str) -> str:
-    m = INI_VERSION_RE.search(text)
-    if not m:
-        raise RuntimeError("version missing in acc_version.ini")
-    return m.group(1).strip().strip("'\"")
-
-
-def sync_github(pkg: GithubRelease, pb: Pkgbuild, force: bool) -> SyncResult:
+def sync_github(pkg: GithubReleaseSpec, pb: Pkgbuild, force: bool) -> SyncResult:
     data = fetch_json(f"https://api.github.com/repos/{pkg.upstream}/releases/latest")
     tag = str(data.get("tag_name", "")) if isinstance(data, dict) else ""
     if not tag:
@@ -307,8 +347,8 @@ def sync_github(pkg: GithubRelease, pb: Pkgbuild, force: bool) -> SyncResult:
     return SyncResult(pkg.name, "UPDATE", f"{cur_ver} -> {tag}")
 
 
-def sync_antigravity(pkg: AntigravityFeed, pb: Pkgbuild, force: bool) -> SyncResult:
-    version, build = resolve_antigravity_release()
+def sync_feed(pkg: FeedReleaseSpec, pb: Pkgbuild, force: bool) -> SyncResult:
+    version, build = resolve_feed_release(pkg.feed_url, pkg.manifest_url)
     cur_ver = pb.get("pkgver")
     if cur_ver and version_key(version) < version_key(cur_ver):
         return SyncResult(pkg.name, "SKIP", f"upstream {version} < {cur_ver}")
@@ -320,7 +360,7 @@ def sync_antigravity(pkg: AntigravityFeed, pb: Pkgbuild, force: bool) -> SyncRes
     if not force and cur_ver == version and not rebuild:
         return SyncResult(pkg.name, "OK", f"{version} ({build})")
 
-    url = AGY_DOWNLOAD_TPL.format(version=version, build=build)
+    url = pkg.download_tpl.format(version=version, build=build)
     main_sum = sha256_url(url)
 
     pb.set_version(version, bump_pkgrel=rebuild)
@@ -336,7 +376,7 @@ def sync_antigravity(pkg: AntigravityFeed, pb: Pkgbuild, force: bool) -> SyncRes
     return SyncResult(pkg.name, "UPDATE", f"{cur_ver} -> {version} ({build})")
 
 
-def sync_manifest(pkg: ManifestRelease, pb: Pkgbuild, force: bool) -> SyncResult:
+def sync_manifest(pkg: ManifestReleaseSpec, pb: Pkgbuild, force: bool) -> SyncResult:
     m = YAML_VERSION_RE.search(fetch_text(pkg.manifest_url))
     if not m:
         raise RuntimeError(f"version missing in {pkg.manifest_url}")
@@ -354,19 +394,32 @@ def sync_manifest(pkg: ManifestRelease, pb: Pkgbuild, force: bool) -> SyncResult
     return SyncResult(pkg.name, "UPDATE", f"{cur_ver} -> {version}")
 
 
-def sync_leinux(pkg: LeinuxSource, pb: Pkgbuild, force: bool) -> SyncResult:
-    with ThreadPoolExecutor(max_workers=3) as pool:
+def sync_commit_hybrid(pkg: CommitHybridSpec, pb: Pkgbuild, force: bool) -> SyncResult:
+    with ThreadPoolExecutor(max_workers=1 + len(pkg.companion_urls)) as pool:
         commit_fut = pool.submit(fetch_json, f"https://api.github.com/repos/{pkg.upstream}/commits/main")
-        bin_fut = pool.submit(fetch_bytes, pkg.binary_url)
-        xdb_fut = pool.submit(sha256_url, pkg.xdb_url)
-        commit, bin_bytes, xdb_sum = str(commit_fut.result()["sha"]), bin_fut.result(), xdb_fut.result()
+        first_bin_fut = pool.submit(fetch_bytes, pkg.companion_urls[0]) if pkg.companion_urls else None
+        extra_futs = [pool.submit(sha256_url, u) for u in pkg.companion_urls[1:]]
 
-    bin_sum = hashlib.sha256(bin_bytes).hexdigest()
-    ver_m = BINARY_VERSION_RE.search(bin_bytes)
-    version = ver_m.group(1).decode("ascii") if ver_m else parse_ini_version(fetch_text(pkg.version_ini_url))
+        commit = str(commit_fut.result()["sha"])
+        first_bytes = first_bin_fut.result() if first_bin_fut else b""
+        companion_sums = ([hashlib.sha256(first_bytes).hexdigest()] if first_bin_fut else []) + [
+            f.result() for f in extra_futs
+        ]
+
+    ver_m = BINARY_VERSION_RE.search(first_bytes)
+    if ver_m:
+        version = ver_m.group(1).decode("ascii")
+    elif pkg.version_ini_path:
+        ini = fetch_text(f"https://raw.githubusercontent.com/{pkg.upstream}/{commit}/{pkg.version_ini_path}")
+        ini_m = INI_VERSION_RE.search(ini)
+        if not ini_m:
+            raise RuntimeError(f"version missing in {pkg.version_ini_path}")
+        version = ini_m.group(1).strip().strip("'\"")
+    else:
+        version = pb.get("pkgver") or "0.0.0"
 
     cur_ver = pb.get("pkgver")
-    sums_changed = (bin_sum not in pb.text) or (xdb_sum not in pb.text)
+    sums_changed = any(s not in pb.text for s in companion_sums)
     rebuild = cur_ver == version and (pb.get("_commit") != commit or sums_changed)
 
     if not force and cur_ver == version and not rebuild:
@@ -375,27 +428,25 @@ def sync_leinux(pkg: LeinuxSource, pb: Pkgbuild, force: bool) -> SyncResult:
     archive_sum = sha256_url(f"https://github.com/{pkg.upstream}/archive/{commit}.tar.gz")
     pb.set_version(version, bump_pkgrel=rebuild)
     pb.set_var("_commit", commit)
-    pb.set_all_sums(archive_sum, bin_sum, xdb_sum)
+    pb.set_all_sums(archive_sum, *companion_sums)
     pb.save()
     return SyncResult(pkg.name, "UPDATE", f"{version} ({commit[:7]})")
 
 
-def sync_package(pkg: PackageSpec, force: bool) -> SyncResult:
-    pb = Pkgbuild(pkg.name)
-    if not pb.exists:
-        return SyncResult(pkg.name, "ERROR", f"{pb.path} not found")
+def sync_entry(entry: tuple[Pkgbuild, PackageSpec], force: bool) -> SyncResult:
+    pb, spec = entry
     try:
-        match pkg:
-            case GithubRelease():
-                return sync_github(pkg, pb, force)
-            case AntigravityFeed():
-                return sync_antigravity(pkg, pb, force)
-            case ManifestRelease():
-                return sync_manifest(pkg, pb, force)
-            case LeinuxSource():
-                return sync_leinux(pkg, pb, force)
+        match spec:
+            case GithubReleaseSpec():
+                return sync_github(spec, pb, force)
+            case FeedReleaseSpec():
+                return sync_feed(spec, pb, force)
+            case ManifestReleaseSpec():
+                return sync_manifest(spec, pb, force)
+            case CommitHybridSpec():
+                return sync_commit_hybrid(spec, pb, force)
     except Exception as exc:
-        return SyncResult(pkg.name, "ERROR", str(exc))
+        return SyncResult(pb.name, "ERROR", str(exc))
 
 
 def get_release_assets(repo: str) -> set[str]:
@@ -476,10 +527,11 @@ def write_github_outputs(state: RepoState, skip: bool) -> None:
 def main() -> None:
     repo = os.environ.get("GITHUB_REPOSITORY", "AsabaLazy/aur-ASLZ")
     force = os.environ.get("FORCE_BUILD", "false").lower() == "true"
+    entries = discover_packages()
 
     with ThreadPoolExecutor(max_workers=8) as pool:
         assets_fut = pool.submit(get_release_assets, repo)
-        results = list(pool.map(lambda pkg: sync_package(pkg, force), PACKAGES))
+        results = list(pool.map(lambda item: sync_entry(item, force), entries))
         release_assets = assets_fut.result()
 
     for r in results:
@@ -490,7 +542,7 @@ def main() -> None:
     skip = not updated_pkgs and not state.drift and not force
 
     print(
-        f"\nSummary: {len(updated_pkgs)} updated, "
+        f"\nSummary: {len(entries)} discovered, {len(updated_pkgs)} updated, "
         f"{len(state.build_pkgs)} to build ({', '.join(state.build_pkgs) or 'none'}), "
         f"obsolete: {len(state.obsolete_assets)}, skip: {skip}"
     )

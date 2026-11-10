@@ -5,6 +5,8 @@ pkgver=2.31.0
 pkgrel=1
 # execution_id from the official /releases feed
 _build=6379060755038208
+_feed_url='https://antigravity-hub-auto-updater-974169037036.us-central1.run.app/releases'
+_manifest_url='https://antigravity-hub-auto-updater-974169037036.us-central1.run.app/manifest/latest-x64-linux.yml'
 pkgdesc='Google Antigravity agentic development platform (prebuilt desktop client)'
 arch=('x86_64')
 url='https://antigravity.google/'
