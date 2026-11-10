@@ -97,6 +97,9 @@ jobs:
                 repo-remove aslz.db.tar.gz $REMOVED_PKGS || true
               fi
               shopt -s nullglob
+              for f in *:*; do
+                mv -f "$f" "${f//:/\.}"
+              done
               pkgs=(*.pkg.tar.zst)
               if (( ${#pkgs[@]} )); then
                 repo-add aslz.db.tar.gz "${pkgs[@]}"

@@ -31,7 +31,8 @@ ASSET_VER_TOKEN_RE = re.compile(
 )
 MANIFEST_BUILD_RE = re.compile(r"/[0-9.]+-([0-9]+)/")
 YAML_VERSION_RE = re.compile(r"^version:\s*(.+)", re.MULTILINE)
-INI_VERSION_RE = re.compile(r"^(?:version|UPSTREAM_VERSION)=(.+)", re.MULTILINE)
+INI_VERSION_RE = re.compile(r"^(?:version|UPSTREAM_VERSION)\s*=\s*(.+)", re.MULTILINE)
+PINNED_SHA256_RE = re.compile(r'^(?:BIN|XDB)_SHA256="([0-9a-f]{64})"', re.MULTILINE)
 PKG_ASSET_RE = re.compile(r"^(.+)-[^-]+-[^-]+-[^-]+\.pkg\.tar\.zst$")
 README_TABLE_RE = re.compile(r"(^\| :--- \| :--- \|\n)(?:\|.*\n)+", re.MULTILINE)
 
@@ -182,7 +183,7 @@ class Pkgbuild:
             m = re.search(r"source_x86_64=\(([^)]*)\)", self.text, re.DOTALL)
             if m:
                 raw = m.group(1)
-                for k in ("pkgname", "pkgver", "url", "_commit", "_hans_commit", "_build"):
+                for k in ("pkgname", "pkgver", "url", "_corever", "_commit", "_hans_commit", "_build"):
                     if val := self.get(k):
                         raw = raw.replace(f"${{{k}}}", val).replace(f"${k}", val)
                 entries.extend(tok.strip("'\"") for tok in re.findall(r"""['"][^'"]+['"]|\S+""", raw))
@@ -430,43 +431,65 @@ def sync_manifest(pkg: ManifestReleaseSpec, pb: Pkgbuild, force: bool) -> SyncRe
 
 
 def sync_commit_hybrid(pkg: CommitHybridSpec, pb: Pkgbuild, force: bool) -> SyncResult:
-    with ThreadPoolExecutor(max_workers=1 + len(pkg.companion_urls)) as pool:
-        commit_fut = pool.submit(fetch_json, f"https://api.github.com/repos/{pkg.upstream}/commits/main")
-        first_bin_fut = (
-            pool.submit(fetch_bytes, pkg.companion_urls[0])
-            if pkg.companion_urls and pkg.version_regex
-            else None
-        )
-        stream_urls = pkg.companion_urls[1:] if first_bin_fut else pkg.companion_urls
-        stream_futs = [pool.submit(sha256_url, u) for u in stream_urls]
+    if pb.get("_corever"):
+        commit = str(fetch_json(f"https://api.github.com/repos/{pkg.upstream}/commits/main")["sha"])
+        raw_base = f"https://raw.githubusercontent.com/{pkg.upstream}/{commit}"
+        ini_path = pkg.version_ini_path or "Cargo.toml"
+        with ThreadPoolExecutor(max_workers=3) as pool:
+            ver_fut = pool.submit(fetch_text, f"{raw_base}/{ini_path}")
+            core_fut = pool.submit(fetch_text, f"{raw_base}/opt/leigod/config/acc_version.ini")
+            inst_fut = pool.submit(fetch_text, f"{raw_base}/install.sh")
+            ver_m = INI_VERSION_RE.search(ver_fut.result())
+            core_m = INI_VERSION_RE.search(core_fut.result())
+            companion_sums = PINNED_SHA256_RE.findall(inst_fut.result())
 
-        commit = str(commit_fut.result()["sha"])
-        first_bytes = first_bin_fut.result() if first_bin_fut else b""
-        companion_sums = ([hashlib.sha256(first_bytes).hexdigest()] if first_bin_fut else []) + [
-            f.result() for f in stream_futs
-        ]
-
-    ver_m = re.search(pkg.version_regex.encode("ascii"), first_bytes) if pkg.version_regex and first_bytes else None
-    if ver_m:
-        version = ver_m.group(1).decode("ascii")
-    elif pkg.version_ini_path:
-        ini = fetch_text(f"https://raw.githubusercontent.com/{pkg.upstream}/{commit}/{pkg.version_ini_path}")
-        ini_m = INI_VERSION_RE.search(ini)
-        if not ini_m:
-            raise RuntimeError(f"version missing in {pkg.version_ini_path}")
-        version = ini_m.group(1).strip().strip("'\"")
+        if not ver_m or not core_m or len(companion_sums) != len(pkg.companion_urls):
+            raise RuntimeError(f"incomplete metadata at {pkg.upstream}@{commit[:7]}")
+        version = ver_m.group(1).strip().strip("'\"")
+        corever = core_m.group(1).strip().strip("'\"")
+        core_changed = pb.get("_corever") != corever
     else:
-        version = pb.get("pkgver") or "0.0.0"
+        with ThreadPoolExecutor(max_workers=1 + len(pkg.companion_urls)) as pool:
+            commit_fut = pool.submit(fetch_json, f"https://api.github.com/repos/{pkg.upstream}/commits/main")
+            first_bin_fut = (
+                pool.submit(fetch_bytes, pkg.companion_urls[0])
+                if pkg.companion_urls and pkg.version_regex
+                else None
+            )
+            stream_urls = pkg.companion_urls[1:] if first_bin_fut else pkg.companion_urls
+            stream_futs = [pool.submit(sha256_url, u) for u in stream_urls]
+
+            commit = str(commit_fut.result()["sha"])
+            first_bytes = first_bin_fut.result() if first_bin_fut else b""
+            companion_sums = ([hashlib.sha256(first_bytes).hexdigest()] if first_bin_fut else []) + [
+                f.result() for f in stream_futs
+            ]
+
+        ver_m = re.search(pkg.version_regex.encode("ascii"), first_bytes) if pkg.version_regex and first_bytes else None
+        if ver_m:
+            version = ver_m.group(1).decode("ascii")
+        elif pkg.version_ini_path:
+            ini = fetch_text(f"https://raw.githubusercontent.com/{pkg.upstream}/{commit}/{pkg.version_ini_path}")
+            ini_m = INI_VERSION_RE.search(ini)
+            if not ini_m:
+                raise RuntimeError(f"version missing in {pkg.version_ini_path}")
+            version = ini_m.group(1).strip().strip("'\"")
+        else:
+            version = pb.get("pkgver") or "0.0.0"
+        corever = None
+        core_changed = False
 
     cur_ver = pb.get("pkgver")
     sums_changed = any(s not in pb.text for s in companion_sums)
-    rebuild = cur_ver == version and (pb.get("_commit") != commit or sums_changed)
+    rebuild = cur_ver == version and (pb.get("_commit") != commit or core_changed or sums_changed)
 
     if not force and cur_ver == version and not rebuild:
         return SyncResult(pkg.name, "OK", f"{version} ({commit[:7]})")
 
     archive_sum = sha256_url(f"https://github.com/{pkg.upstream}/archive/{commit}.tar.gz")
     pb.set_version(version, bump_pkgrel=rebuild)
+    if corever:
+        pb.set_var("_corever", corever)
     pb.set_var("_commit", commit)
     pb.set_all_sums(archive_sum, *companion_sums)
     pb.save()
@@ -527,13 +550,15 @@ def inspect_repo_state(release_assets: set[str], updated_pkgs: set[str], force: 
                 continue
             pb = Pkgbuild(pkg_dir.name)
             pkgname = pb.get("pkgname") or pkg_dir.name
+            epoch = pb.get("epoch")
             pkgver = pb.get("pkgver")
             pkgrel = pb.get("pkgrel") or "1"
             active_names.add(pkgname)
             if not pkgver:
                 continue
 
-            pat = re.compile(rf"^{re.escape(pkgname)}-{re.escape(pkgver)}-{re.escape(pkgrel)}-[^-]+\.pkg\.tar\.zst$")
+            ver_token = f"{epoch}.{pkgver}" if epoch else pkgver
+            pat = re.compile(rf"^{re.escape(pkgname)}-{re.escape(ver_token)}-{re.escape(pkgrel)}-[^-]+\.pkg\.tar\.zst$")
             expected.append(pat)
             in_release = any(pat.match(a) for a in release_assets)
             if force or pkg_dir.name in updated_pkgs or pkg_dir.name in push_touched or not in_release:
