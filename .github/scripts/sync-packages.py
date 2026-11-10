@@ -1,0 +1,610 @@
+#!/usr/bin/env python3
+import hashlib
+import json
+import os
+import re
+import subprocess
+import sys
+import urllib.request
+
+PACKAGES = [
+    {
+        "name": "astrlink-bin",
+        "upstream": "Calcium-Ion/AstrLink",
+        "asset_pattern": r"AstrLink_.*_amd64\.deb",
+    },
+    {
+        "name": "magpie-bin",
+        "upstream": "yetone/magpie",
+        "asset_pattern": r"^magpie-linux-amd64$",
+    },
+    {
+        "name": "gopeed-bin",
+        "upstream": "GopeedLab/gopeed",
+        "asset_pattern": r"Gopeed-.*-linux-amd64\.deb",
+    },
+    {
+        "name": "gopeed-fluent-bin",
+        "upstream": "AsabaLazy/gopeed-fluent",
+        "asset_pattern": r"Gopeed_Fluent_.*_linux_amd64\.deb",
+    },
+    {
+        "name": "novelmikuer-bin",
+        "upstream": "AsabaLazy/NovelMikuer",
+        "asset_pattern": r"NovelMikuer_.*_amd64\.deb",
+    },
+    {
+        "name": "antigravity-cli-bin",
+        "upstream": "google-antigravity/antigravity-cli",
+        "asset_pattern": r"^agy_cli_linux_x64\.tar\.gz$",
+    },
+    {
+        "name": "antigravity-cli-fix-bin",
+        "upstream": "google-antigravity/antigravity-cli",
+        "asset_pattern": r"^agy_cli_linux_x64\.tar\.gz$",
+    },
+    {
+        "name": "antigravity-cli-512k-bin",
+        "upstream": "google-antigravity/antigravity-cli",
+        "asset_pattern": r"^agy_cli_linux_x64\.tar\.gz$",
+    },
+    {
+        "name": "antigravity-bin",
+        # Official feed used by antigravity.google/download. The manifest is the
+        # app's electron-updater config; the page is a last-resort fallback.
+        "release_feed": "https://antigravity-hub-auto-updater-974169037036.us-central1.run.app/releases",
+        "manifest_url": "https://antigravity-hub-auto-updater-974169037036.us-central1.run.app/manifest/latest-x64-linux.yml",
+        "manifest_build_regex": r"antigravity-hub/[0-9.]+-([0-9]+)/",
+        "download_page_url": "https://antigravity.google/download",
+        "page_artifact_regex": r"antigravity-hub/([0-9.]+)-([0-9]+)/linux-x64/Antigravity\.tar\.gz",
+        "download_url_template": "https://storage.googleapis.com/antigravity-public/antigravity-hub/{version}-{build}/linux-x64/Antigravity.tar.gz",
+    },
+    {
+        "name": "antigravity-hans-bin",
+        "release_feed": "https://antigravity-hub-auto-updater-974169037036.us-central1.run.app/releases",
+        "manifest_url": "https://antigravity-hub-auto-updater-974169037036.us-central1.run.app/manifest/latest-x64-linux.yml",
+        "manifest_build_regex": r"antigravity-hub/[0-9.]+-([0-9]+)/",
+        "download_page_url": "https://antigravity.google/download",
+        "page_artifact_regex": r"antigravity-hub/([0-9.]+)-([0-9]+)/linux-x64/Antigravity\.tar\.gz",
+        "download_url_template": "https://storage.googleapis.com/antigravity-public/antigravity-hub/{version}-{build}/linux-x64/Antigravity.tar.gz",
+        "overlay_repo": "yuexps/Antigravity-Hans",
+        "overlay_path": "antigravity-hans-overlay.js",
+    },
+    {
+        "name": "dimagent-bin",
+        "manifest_url": "https://dimcode.echooai.com/updates/stable/linux/x64/latest-linux.yml",
+        "download_url_template": "https://dimcode.echooai.com/updates/stable/linux/x64/DimAgent-{version}.deb",
+    },
+    {
+        "name": "leinux-bin",
+        "upstream": "AsabaLazy/Leinux",
+        "asset_pattern": r"^acc-gw\.router\.amd64$",
+        "release_env_url": "https://raw.githubusercontent.com/AsabaLazy/Leinux/main/opt/leigod/config/acc_version.ini",
+        "binary_url": "http://119.3.40.126/acc-gw.router.amd64",
+        "xdb_url": "http://119.3.40.126/ipdatacloud_country.xdb",
+    },
+]
+
+def make_headers(url):
+    headers = {"User-Agent": "aur-monorepo-sync"}
+    token = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
+    if token and (url.startswith("https://github.com/") or url.startswith("https://api.github.com/")):
+        headers["Authorization"] = f"Bearer {token}"
+    return headers
+
+def fetch_text(url):
+    req = urllib.request.Request(url, headers=make_headers(url))
+    with urllib.request.urlopen(req) as resp:
+        return resp.read().decode()
+
+def version_tuple(version):
+    return tuple(int(part) for part in re.findall(r"\d+", version))
+
+REQUIRED_DB_ASSETS = {"aslz.db", "aslz.db.tar.gz", "aslz.files", "aslz.files.tar.gz"}
+
+def get_pkgbuild_var(name, var):
+    path = f"packages/{name}/PKGBUILD"
+    if not os.path.exists(path):
+        return None
+    with open(path) as f:
+        m = re.search(rf"^{re.escape(var)}=(.+)", f.read(), re.MULTILINE)
+    return m.group(1).strip().strip("'\"") if m else None
+
+def get_release_assets(repo):
+    if not repo:
+        return None
+    res = subprocess.run(
+        [
+            "gh", "release", "view", "repo", "--repo", repo,
+            "--json", "assets", "-q", ".assets[].name",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    if res.returncode != 0:
+        print(f"  Warning: gh release view failed: {res.stderr.strip()}", file=sys.stderr)
+        return set()
+    return {line.strip() for line in res.stdout.splitlines() if line.strip()}
+
+def already_published(release_assets, name, version, force):
+    if release_assets is None or force:
+        return False
+    if get_pkgbuild_var(name, "pkgver") != version:
+        return False
+    pkgrel = get_pkgbuild_var(name, "pkgrel") or "1"
+    pattern = re.compile(
+        rf"^{re.escape(name)}-{re.escape(version)}-{re.escape(pkgrel)}-[^-]+\.pkg\.tar\.zst$"
+    )
+    return any(pattern.match(asset) for asset in release_assets)
+
+def get_push_modified_packages():
+    if os.environ.get("GITHUB_EVENT_NAME") != "push":
+        return set()
+    res = subprocess.run(
+        ["git", "diff", "--name-only", "HEAD~1", "HEAD"],
+        capture_output=True,
+        text=True,
+    )
+    if res.returncode != 0:
+        return set()
+    touched = set()
+    for line in res.stdout.splitlines():
+        parts = line.strip().split("/")
+        if len(parts) >= 2 and parts[0] == "packages" and parts[1] != "repo":
+            touched.add(parts[1])
+    return touched
+
+
+def inspect_repo_state(release_assets, updated_packages, force):
+    missing_db = sorted(REQUIRED_DB_ASSETS - (release_assets or set()))
+    if missing_db:
+        print(f"  [SYNC] Missing repo database asset(s): {', '.join(missing_db)}")
+
+    push_touched = get_push_modified_packages()
+    build_pkgs = []
+    expected_patterns = []
+    active_pkgnames = set()
+
+    if os.path.isdir("packages"):
+        for entry in sorted(os.listdir("packages")):
+            pkgbuild_path = os.path.join("packages", entry, "PKGBUILD")
+            if entry == "repo" or not os.path.isfile(pkgbuild_path):
+                continue
+            pkgname = get_pkgbuild_var(entry, "pkgname") or entry
+            active_pkgnames.add(pkgname)
+            pkgver = get_pkgbuild_var(entry, "pkgver")
+            pkgrel = get_pkgbuild_var(entry, "pkgrel") or "1"
+            if not pkgver:
+                continue
+            pat = re.compile(
+                rf"^{re.escape(pkgname)}-{re.escape(pkgver)}-{re.escape(pkgrel)}-[^-]+\.pkg\.tar\.zst$"
+            )
+            expected_patterns.append(pat)
+            in_release = bool(release_assets and any(pat.match(a) for a in release_assets))
+            if force or entry in push_touched or not in_release:
+                if not in_release and entry not in updated_packages:
+                    print(f"  [SYNC] Missing release package: {pkgname}-{pkgver}-{pkgrel}")
+                elif entry in push_touched and entry not in updated_packages:
+                    print(f"  [SYNC] Package modified in push: {entry}")
+                build_pkgs.append(entry)
+
+    obsolete_assets = []
+    removed_pkgnames = []
+    for asset in sorted(release_assets or set()):
+        if asset.endswith(".pkg.tar.zst") and not any(p.match(asset) for p in expected_patterns):
+            print(f"  [SYNC] Obsolete release package: {asset}")
+            obsolete_assets.append(asset)
+            m = re.match(r"^(.+)-[^-]+-[^-]+-[^-]+\.pkg\.tar\.zst$", asset)
+            if m and m.group(1) not in active_pkgnames and m.group(1) not in removed_pkgnames:
+                removed_pkgnames.append(m.group(1))
+
+    drift = bool(missing_db or build_pkgs or obsolete_assets)
+    return drift, build_pkgs, obsolete_assets, removed_pkgnames, bool(missing_db)
+
+_SHA256_CACHE = {}
+_FEED_CACHE = {}
+
+
+def stream_sha256(download_url):
+    if download_url in _SHA256_CACHE:
+        return _SHA256_CACHE[download_url]
+    print(f"  Streaming {download_url} to calculate sha256...")
+    req = urllib.request.Request(download_url, headers=make_headers(download_url))
+    hasher = hashlib.sha256()
+    with urllib.request.urlopen(req) as resp:
+        while chunk := resp.read(65536):
+            hasher.update(chunk)
+    digest = hasher.hexdigest()
+    _SHA256_CACHE[download_url] = digest
+    return digest
+
+
+def resolve_overlay_commit(repo, path):
+    commits_url = f"https://api.github.com/repos/{repo}/commits?path={path}&per_page=1"
+    data = json.loads(fetch_text(commits_url))
+    if isinstance(data, list) and data:
+        return data[0]["sha"]
+    main_data = json.loads(fetch_text(f"https://api.github.com/repos/{repo}/commits/main"))
+    return main_data["sha"]
+
+
+def resolve_feed_release(pkg):
+    cache_key = (pkg.get("release_feed"), pkg.get("manifest_url"))
+    if cache_key in _FEED_CACHE:
+        return _FEED_CACHE[cache_key]
+    feed_version = feed_build = None
+    manifest_version = manifest_build = None
+
+    try:
+        feed = json.loads(fetch_text(pkg["release_feed"]))
+        release = feed[0] if isinstance(feed, list) else feed["versions"][0]
+        feed_version = str(release.get("version", "")).strip()
+        feed_build = str(release.get("execution_id", "")).strip()
+        if not feed_version or not feed_build:
+            raise ValueError("version or execution_id missing")
+    except Exception as e:
+        print(f"  Warning: release feed unavailable: {e}", file=sys.stderr)
+
+    manifest_url = pkg.get("manifest_url")
+    if manifest_url:
+        try:
+            manifest_text = fetch_text(manifest_url)
+            m = re.search(r"^version:\s*(.+)", manifest_text, re.MULTILINE)
+            manifest_version = m.group(1).strip() if m else ""
+            build_regex = pkg.get("manifest_build_regex")
+            m = re.search(build_regex, manifest_text) if build_regex else None
+            manifest_build = m.group(1) if m else ""
+            if not manifest_version or not manifest_build:
+                raise ValueError("version or build missing")
+        except Exception as e:
+            print(f"  Warning: manifest unavailable: {e}", file=sys.stderr)
+            manifest_version = manifest_build = None
+
+    if feed_version and feed_build and manifest_version and manifest_build:
+        if version_tuple(manifest_version) > version_tuple(feed_version):
+            print(f"  Warning: manifest {manifest_version} is newer than feed {feed_version}")
+            version, build = manifest_version, manifest_build
+        else:
+            version, build = feed_version, feed_build
+            if manifest_version != feed_version:
+                print(f"  Warning: feed {feed_version} is newer than manifest {manifest_version}")
+            elif manifest_build != feed_build:
+                print("  Warning: feed and manifest build ids differ; using feed")
+    elif feed_version and feed_build:
+        version, build = feed_version, feed_build
+    elif manifest_version and manifest_build:
+        print("  Warning: using manifest because the release feed is unavailable")
+        version, build = manifest_version, manifest_build
+    else:
+        page_url = pkg.get("download_page_url")
+        if not page_url:
+            raise RuntimeError("no release source available")
+        page_text = fetch_text(page_url)
+        page_regex = pkg.get("page_artifact_regex")
+        m = re.search(page_regex, page_text) if page_regex else None
+        if not m:
+            raise RuntimeError("could not parse download page")
+        version, build = m.group(1), m.group(2)
+        print("  Warning: using download page fallback (may be stale)")
+
+    _FEED_CACHE[cache_key] = (version, build)
+    return version, build
+
+def get_asset_sha256(upstream, tag, asset_name, download_url):
+    # 1. 尝试从上游发布的 SHA256SUMS 文件中匹配
+    sums_url = f"https://github.com/{upstream}/releases/download/{tag}/SHA256SUMS"
+    try:
+        sums_text = fetch_text(sums_url)
+        for line in sums_text.splitlines():
+            if asset_name in line:
+                return line.split()[0]
+    except Exception:
+        pass
+
+    # 2. 回退：直接流式下载二进制计算 sha256
+    return stream_sha256(download_url)
+
+def update_pkgbuild(
+    name,
+    version,
+    sha256,
+    download_url,
+    build=None,
+    bump_pkgrel=False,
+    hans_commit=None,
+    overlay_sha256=None,
+):
+    pkgbuild_path = f"packages/{name}/PKGBUILD"
+    if not os.path.exists(pkgbuild_path):
+        print(f"  Error: {pkgbuild_path} does not exist", file=sys.stderr)
+        return False
+
+    with open(pkgbuild_path, "r") as f:
+        content = f.read()
+
+    old_ver = re.search(r"^pkgver=(.+)", content, re.MULTILINE)
+    same_ver = bool(old_ver and old_ver.group(1).strip().strip("'\"") == version)
+    content = re.sub(r"^pkgver=.*", f"pkgver={version}", content, flags=re.MULTILINE)
+    m = re.search(r"^pkgrel=(\d+)", content, re.MULTILINE)
+    if bump_pkgrel:
+        pkgrel = str(int(m.group(1)) + 1) if m else "1"
+    elif same_ver and m:
+        pkgrel = m.group(1)
+    else:
+        pkgrel = "1"
+    content = re.sub(r"^pkgrel=.*", f"pkgrel={pkgrel}", content, flags=re.MULTILINE)
+    if build is not None:
+        content = re.sub(r"^_build=.*", f"_build={build}", content, flags=re.MULTILINE)
+    if hans_commit is not None and overlay_sha256 is not None:
+        content = re.sub(r"^_hans_commit=.*", f"_hans_commit={hans_commit}", content, flags=re.MULTILINE)
+        content = re.sub(
+            r'(\$\{pkgname\}-\$\{pkgver\}\.tar\.gz::)https://[^"]+',
+            rf"\g<1>{download_url}",
+            content,
+        )
+        content = re.sub(
+            r"sha256sums_x86_64=\(\s*'[^']+'\s*'[^']+'\s*\)",
+            f"sha256sums_x86_64=('{sha256}'\n                   '{overlay_sha256}')",
+            content,
+        )
+    else:
+        content = re.sub(r"(sha256sums_x86_64=\(')[^']+", rf"\g<1>{sha256}", content)
+        content = re.sub(r'::https://[^"]+', rf'::{download_url}', content)
+
+    with open(pkgbuild_path, "w") as f:
+        f.write(content)
+    return True
+
+def update_leigod_pkgbuild(name, version, commit, archive_sha256, bin_sha256, xdb_sha256, bump_pkgrel=False):
+    pkgbuild_path = f"packages/{name}/PKGBUILD"
+    if not os.path.exists(pkgbuild_path):
+        print(f"  Error: {pkgbuild_path} does not exist", file=sys.stderr)
+        return False
+
+    with open(pkgbuild_path, "r") as f:
+        content = f.read()
+
+    old_ver = re.search(r"^pkgver=(.+)", content, re.MULTILINE)
+    same_ver = bool(old_ver and old_ver.group(1).strip().strip("'\"") == version)
+    content = re.sub(r"^pkgver=.*", f"pkgver={version}", content, flags=re.MULTILINE)
+    m = re.search(r"^pkgrel=(\d+)", content, re.MULTILINE)
+    if bump_pkgrel:
+        pkgrel = str(int(m.group(1)) + 1) if m else "1"
+    elif same_ver and m:
+        pkgrel = m.group(1)
+    else:
+        pkgrel = "1"
+    content = re.sub(r"^pkgrel=.*", f"pkgrel={pkgrel}", content, flags=re.MULTILINE)
+    content = re.sub(r"^_commit=.*", f"_commit={commit}", content, flags=re.MULTILINE)
+    content = re.sub(
+        r"sha256sums_x86_64=\(\s*'[^']+'\s*'[^']+'\s*'[^']+'\s*\)",
+        f"sha256sums_x86_64=(\n  '{archive_sha256}'\n  '{bin_sha256}'\n  '{xdb_sha256}'\n)",
+        content,
+    )
+
+    with open(pkgbuild_path, "w") as f:
+        f.write(content)
+    return True
+
+def main():
+    repo = os.environ.get("GITHUB_REPOSITORY", "AsabaLazy/aur-ASLZ")
+    force = os.environ.get("FORCE_BUILD", "false").lower() == "true"
+    release_assets = get_release_assets(repo)
+    updated_packages = []
+
+    for pkg in PACKAGES:
+        name = pkg["name"]
+
+        # 处理基于自定义 release feed 的软件包
+        if "release_feed" in pkg:
+            print(f"Checking {name} (release feed)...")
+            try:
+                version, build = resolve_feed_release(pkg)
+            except Exception as e:
+                print(f"  Error resolving release for {name}: {e}", file=sys.stderr)
+                continue
+
+            current_version = get_pkgbuild_var(name, "pkgver")
+            current_build = get_pkgbuild_var(name, "_build")
+            if current_version and version_tuple(version) < version_tuple(current_version):
+                print(f"  [SKIP] {name} source reports {version}, older than packaged {current_version}.")
+                continue
+
+            hans_commit = None
+            overlay_url = None
+            if "overlay_repo" in pkg:
+                try:
+                    hans_commit = resolve_overlay_commit(pkg["overlay_repo"], pkg["overlay_path"])
+                    overlay_url = (
+                        f"https://raw.githubusercontent.com/{pkg['overlay_repo']}/{hans_commit}/{pkg['overlay_path']}"
+                    )
+                except Exception as e:
+                    print(f"  Error resolving overlay commit for {name}: {e}", file=sys.stderr)
+                    continue
+
+            current_hans_commit = get_pkgbuild_var(name, "_hans_commit") if hans_commit else None
+            overlay_changed = bool(hans_commit and current_hans_commit != hans_commit)
+            rebuild = current_version == version and (current_build != build or overlay_changed)
+            download_url = pkg["download_url_template"].format(version=version, build=build)
+
+            if not rebuild and already_published(release_assets, name, version, force):
+                print(f"  [OK] {name} is up-to-date with {version}.")
+                continue
+
+            print(f"  [UPDATE] {name} needs build for {version} (build {build}).")
+            try:
+                sha256 = stream_sha256(download_url)
+                overlay_sha256 = stream_sha256(overlay_url) if overlay_url else None
+            except Exception as e:
+                print(f"  Error calculating checksum for {download_url}: {e}", file=sys.stderr)
+                continue
+
+            if update_pkgbuild(
+                name,
+                version,
+                sha256,
+                download_url,
+                build=build,
+                bump_pkgrel=rebuild,
+                hans_commit=hans_commit,
+                overlay_sha256=overlay_sha256,
+            ):
+                updated_packages.append(name)
+            continue
+
+        # 处理基于独立 YAML / JSON Manifest 的软件包
+        if "manifest_url" in pkg:
+            print(f"Checking {name} (manifest: {pkg['manifest_url']})...")
+            try:
+                manifest_text = fetch_text(pkg["manifest_url"])
+                m = re.search(r"^version:\s*(.+)", manifest_text, re.MULTILINE)
+                if not m:
+                    print(f"  Error: version not found in manifest for {name}", file=sys.stderr)
+                    continue
+                version = m.group(1).strip()
+            except Exception as e:
+                print(f"  Error fetching manifest for {name}: {e}", file=sys.stderr)
+                continue
+
+            download_url = pkg["download_url_template"].format(version=version)
+
+            if already_published(release_assets, name, version, force):
+                print(f"  [OK] {name} is up-to-date with {version}.")
+                continue
+
+            print(f"  [UPDATE] {name} needs build for {version}.")
+            try:
+                sha256 = stream_sha256(download_url)
+            except Exception as e:
+                print(f"  Error calculating checksum for {download_url}: {e}", file=sys.stderr)
+                continue
+
+            if update_pkgbuild(name, version, sha256, download_url):
+                updated_packages.append(name)
+            continue
+
+        # 处理基于 release.env + 官方二进制直链的仓库（如 leigod-plugin-bin）
+        if "release_env_url" in pkg:
+            upstream = pkg["upstream"]
+            print(f"Checking {name} (upstream: {upstream})...")
+            try:
+                commit_api = f"https://api.github.com/repos/{upstream}/commits/main"
+                commit_data = json.loads(fetch_text(commit_api))
+                commit = commit_data["sha"]
+
+                req = urllib.request.Request(pkg["binary_url"], headers=make_headers(pkg["binary_url"]))
+                with urllib.request.urlopen(req) as resp:
+                    bin_bytes = resp.read()
+                bin_sha256 = hashlib.sha256(bin_bytes).hexdigest()
+                ver_match = re.search(rb"ipPortProtocolReport\x00([0-9]+(?:\.[0-9]+)+)\x00", bin_bytes)
+                if ver_match:
+                    version = ver_match.group(1).decode()
+                else:
+                    env_text = fetch_text(pkg["release_env_url"])
+                    m = re.search(r"^(?:version|UPSTREAM_VERSION)=(.+)", env_text, re.MULTILINE)
+                    if not m:
+                        raise ValueError("version missing in acc_version.ini")
+                    version = m.group(1).strip().strip("'\"")
+
+                xdb_sha256 = stream_sha256(pkg["xdb_url"])
+            except Exception as e:
+                print(f"  Error fetching metadata for {name}: {e}", file=sys.stderr)
+                continue
+
+            current_version = get_pkgbuild_var(name, "pkgver")
+            current_commit = get_pkgbuild_var(name, "_commit")
+            with open(f"packages/{name}/PKGBUILD") as f:
+                current_content = f.read()
+            sums_changed = (bin_sha256 not in current_content) or (xdb_sha256 not in current_content)
+            rebuild = current_version == version and (current_commit != commit or sums_changed)
+
+            if not rebuild and not sums_changed and already_published(release_assets, name, version, force):
+                print(f"  [OK] {name} is up-to-date with {version} ({commit[:7]}).")
+                continue
+
+            print(f"  [UPDATE] {name} needs build for {version} ({commit[:7]}).")
+            archive_url = f"https://github.com/{upstream}/archive/{commit}.tar.gz"
+            try:
+                archive_sha256 = stream_sha256(archive_url)
+            except Exception as e:
+                print(f"  Error calculating checksum for {archive_url}: {e}", file=sys.stderr)
+                continue
+
+            if update_leigod_pkgbuild(
+                name, version, commit, archive_sha256, bin_sha256, xdb_sha256, bump_pkgrel=rebuild
+            ):
+                updated_packages.append(name)
+            continue
+
+        # 处理基于 GitHub Releases 的软件包
+        upstream = pkg["upstream"]
+        print(f"Checking {name} (upstream: {upstream})...")
+
+        api_url = f"https://api.github.com/repos/{upstream}/releases/latest"
+        req = urllib.request.Request(api_url, headers=make_headers(api_url))
+        try:
+            data = json.loads(urllib.request.urlopen(req).read())
+        except Exception as e:
+            print(f"  Error fetching upstream for {name}: {e}", file=sys.stderr)
+            continue
+
+        tag = data.get("tag_name", "")
+        if not tag:
+            continue
+        version = tag.lstrip("v")
+
+        # 检查是否已打包发布过
+        if already_published(release_assets, name, version, force):
+            print(f"  [OK] {name} is up-to-date with {tag}.")
+            continue
+
+        print(f"  [UPDATE] {name} needs build for {tag}.")
+
+        # 匹配对应平台的 asset
+        asset_info = None
+        for a in data.get("assets", []):
+            if re.search(pkg["asset_pattern"], a["name"]):
+                asset_info = a
+                break
+
+        if not asset_info:
+            print(f"  Error: No asset matching {pkg['asset_pattern']} found in {upstream} {tag}", file=sys.stderr)
+            continue
+
+        asset_name = asset_info["name"]
+        download_url = asset_info["browser_download_url"]
+
+        try:
+            sha256 = get_asset_sha256(upstream, tag, asset_name, download_url)
+        except Exception as e:
+            print(f"  Error calculating checksum for {asset_name}: {e}", file=sys.stderr)
+            continue
+
+        if not sha256:
+            print(f"  Error: sha256 for {asset_name} could not be determined", file=sys.stderr)
+            continue
+
+        if update_pkgbuild(name, version, sha256, download_url):
+            updated_packages.append(name)
+
+    repo_drift, build_pkgs, obsolete_assets, removed_pkgnames, missing_db = inspect_repo_state(
+        release_assets, set(updated_packages), force
+    )
+    skip = len(updated_packages) == 0 and not repo_drift and not force
+    print(
+        f"\nSummary: {len(updated_packages)} package(s) updated, "
+        f"{len(build_pkgs)} package(s) to build ({', '.join(build_pkgs) or 'none'}), "
+        f"repo drift: {repo_drift}. Skip build: {skip}"
+    )
+
+    github_output = os.environ.get("GITHUB_OUTPUT")
+    if github_output:
+        with open(github_output, "a") as f:
+            f.write(f"skip={'true' if skip else 'false'}\n")
+            f.write(f"build_pkgs={' '.join(build_pkgs)}\n")
+            f.write(f"obsolete_assets={' '.join(obsolete_assets)}\n")
+            f.write(f"removed_pkgs={' '.join(removed_pkgnames)}\n")
+            f.write(f"missing_db={'true' if missing_db else 'false'}\n")
+
+if __name__ == "__main__":
+    main()
