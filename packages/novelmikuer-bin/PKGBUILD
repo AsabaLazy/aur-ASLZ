@@ -1,0 +1,19 @@
+# Maintainer: AsabaLazy <https://github.com/AsabaLazy/NovelMikuer>
+pkgname=novelmikuer-bin
+pkgver=0.1.0fix
+pkgrel=1
+pkgdesc="Batch replace and clean novel text (compatible with Legado 3.0 rules)"
+arch=('x86_64')
+url="https://github.com/AsabaLazy/NovelMikuer"
+license=('MIT')
+depends=('webkit2gtk-4.1' 'gtk3')
+provides=('novelmikuer' 'novel-mikuer')
+conflicts=('novelmikuer' 'novel-mikuer')
+options=('!debug' '!strip')
+source_x86_64=("${pkgname}-${pkgver}.deb::https://github.com/AsabaLazy/NovelMikuer/releases/download/v0.1.0fix/NovelMikuer_0.1.0_amd64.deb")
+sha256sums_x86_64=('5dbfebf074a26e4f276360383baf3e24611073b9e93c979555de2cc8e70c0640')
+
+package() {
+  bsdtar -xf data.tar.* -C "${pkgdir}"
+  ln -sf novel_mikuer "${pkgdir}/usr/bin/novelmikuer"
+}
