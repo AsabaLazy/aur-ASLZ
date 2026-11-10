@@ -1,0 +1,70 @@
+# Maintainer: AsabaLazy <https://github.com/AsabaLazy/aur-ASLZ>
+pkgname=leinux-bin
+pkgver=1.3.0.02
+pkgrel=17
+_commit=d2bd5ede31d6be7e953a3b9623fd1c99185fed95
+pkgdesc="Leinux — Native GTK4 GUI, CLI & routing daemon for Leigod Accelerator on Linux"
+arch=('x86_64')
+url="https://github.com/AsabaLazy/Leinux"
+license=('MIT' 'LicenseRef-Proprietary')
+depends=('ca-certificates' 'curl' 'gtk4' 'iproute2' 'libadwaita' 'ipset' 'iptables' 'procps-ng' 'systemd')
+provides=('leinux' 'leigod-plugin' 'leigod-plugin-bin')
+conflicts=('leinux' 'leigod-plugin' 'leigod-plugin-bin')
+replaces=('leigod-plugin-bin')
+options=('!debug' '!strip')
+install="${pkgname}.install"
+backup=(
+  'etc/default/leinux'
+  'opt/leigod/config/accelerator.ini'
+  'opt/leigod/config/acc_version.ini'
+  'opt/leigod/config/new_upgrade_conf.json'
+)
+source_x86_64=(
+  "${pkgname}-${pkgver}-${_commit}.tar.gz::https://github.com/AsabaLazy/Leinux/archive/${_commit}.tar.gz"
+  "acc-gw.router.amd64-${pkgver}::http://119.3.40.126/acc-gw.router.amd64"
+  "ipdatacloud_country.xdb-${pkgver}::http://119.3.40.126/ipdatacloud_country.xdb"
+)
+sha256sums_x86_64=(
+  'e543ed84ac51fe7d093b92b983b607aef16a653bab39685c9dfbb0d06708cb6c'
+  '3640d47abaee4a6b4312e3489137311ab309d27dcb92ab640c0fe3d953328c1b'
+  '3536000ee9eb3997538cb37a14f90d571979734c48b23b8d548eceac16666273'
+)
+
+package() {
+  cd "${srcdir}/Leinux-${_commit}"
+
+  install -dm755 "${pkgdir}/opt/leigod/config"
+  install -Dm755 "opt/leigod/steamdeck_acc_monitor.sh" "${pkgdir}/opt/leigod/steamdeck_acc_monitor.sh"
+  install -Dm755 "opt/leigod/fake_ps" "${pkgdir}/opt/leigod/fake_ps"
+  install -Dm755 "opt/leigod/leigod_cleanup_net.sh" "${pkgdir}/opt/leigod/leigod_cleanup_net.sh"
+  install -Dm755 "bin/leinux" "${pkgdir}/usr/bin/leinux"
+  ln -s leinux "${pkgdir}/usr/bin/lgd"
+  install -Dm644 "share/icons/io.github.asabalazy.leinux.svg" "${pkgdir}/usr/share/icons/hicolor/scalable/apps/io.github.asabalazy.leinux.svg"
+  install -Dm644 "share/icons/io.github.asabalazy.leinux-symbolic.svg" "${pkgdir}/usr/share/icons/hicolor/symbolic/apps/io.github.asabalazy.leinux-symbolic.svg"
+  install -Dm644 "share/io.github.asabalazy.leinux.desktop" "${pkgdir}/usr/share/applications/io.github.asabalazy.leinux.desktop"
+  install -Dm644 "etc/default/leinux" "${pkgdir}/etc/default/leinux"
+  install -Dm644 "polkit/50-leinux.rules" "${pkgdir}/usr/share/polkit-1/rules.d/50-leinux.rules"
+  install -Dm644 "opt/leigod/fake_os-release" "${pkgdir}/opt/leigod/fake_os-release"
+  install -Dm644 "opt/leigod/fake_product_name" "${pkgdir}/opt/leigod/fake_product_name"
+  install -Dm644 "opt/leigod/fake_hosts" "${pkgdir}/opt/leigod/fake_hosts"
+
+  install -Dm644 "opt/leigod/config/acc_version.ini" "${pkgdir}/opt/leigod/config/acc_version.ini"
+  sed -i "s/^version=.*/version=${pkgver}/" "${pkgdir}/opt/leigod/config/acc_version.ini"
+  install -Dm644 "opt/leigod/config/accelerator.ini" "${pkgdir}/opt/leigod/config/accelerator.ini"
+  install -Dm644 "opt/leigod/config/new_upgrade_conf.json" "${pkgdir}/opt/leigod/config/new_upgrade_conf.json"
+  : > "${pkgdir}/opt/leigod/config/accelerator"
+  chmod 0644 "${pkgdir}/opt/leigod/config/accelerator"
+
+  install -Dm755 "${srcdir}/acc-gw.router.amd64-${pkgver}" "${pkgdir}/opt/leigod/acc-gw.router.amd64"
+  install -Dm755 "${srcdir}/acc-gw.router.amd64-${pkgver}" "${pkgdir}/opt/leigod/acc_upgrade_monitor"
+  install -Dm644 "${srcdir}/ipdatacloud_country.xdb-${pkgver}" "${pkgdir}/opt/leigod/config/ipdatacloud_country.xdb"
+
+  install -Dm644 "systemd/leinux-core.service" "${pkgdir}/usr/lib/systemd/system/leinux-core.service"
+  install -Dm644 "systemd/leinux.service" "${pkgdir}/usr/lib/systemd/system/leinux.service"
+  install -Dm644 /dev/stdin "${pkgdir}/usr/lib/tmpfiles.d/leinux.conf" << 'EOF'
+L /home/leigod - - - - /opt/leigod
+EOF
+
+  install -Dm644 "LICENSE" "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+  install -Dm644 "THIRD_PARTY_NOTICES.md" "${pkgdir}/usr/share/licenses/${pkgname}/THIRD_PARTY_NOTICES.md"
+}

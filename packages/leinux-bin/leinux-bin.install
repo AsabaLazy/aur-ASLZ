@@ -1,0 +1,57 @@
+post_install() {
+  if [ ! -e /home/leigod ] || [ -L /home/leigod ]; then
+    ln -sfn /opt/leigod /home/leigod
+  fi
+  if [ -f /opt/leigod/config/accelerator.ini.pacsave ] && grep -q '^token=.\+' /opt/leigod/config/accelerator.ini.pacsave 2>/dev/null; then
+    if ! grep -q '^token=.\+' /opt/leigod/config/accelerator.ini 2>/dev/null; then
+      cp -f /opt/leigod/config/accelerator.ini.pacsave /opt/leigod/config/accelerator.ini
+    fi
+  fi
+  echo "==> Quick launch GUI / CLI: lgd (or leinux)"
+  echo "==> CLI examples: lgd --login | lgd --list | lgd --start hk | lgd --pause | lgd --status"
+}
+
+pre_upgrade() {
+  if command -v systemctl >/dev/null 2>&1; then
+    for u in leigod_webui.service leigod_plugin.service leinux.service leinux-core.service; do
+      systemctl stop "$u" 2>/dev/null || true
+    done
+    systemctl disable leigod_webui.service leigod_plugin.service 2>/dev/null || true
+  fi
+}
+
+post_upgrade() {
+  if [ ! -e /home/leigod ] || [ -L /home/leigod ]; then
+    ln -sfn /opt/leigod /home/leigod
+  fi
+  rm -rf /opt/leigod/webui 2>/dev/null || true
+  if command -v systemctl >/dev/null 2>&1; then
+    systemctl daemon-reload 2>/dev/null || true
+    systemctl enable --now leinux-core.service leinux.service 2>/dev/null || true
+  fi
+}
+
+pre_remove() {
+  if command -v systemctl >/dev/null 2>&1; then
+    systemctl stop leinux.service leinux-core.service 2>/dev/null || true
+    systemctl disable leinux.service leinux-core.service 2>/dev/null || true
+  fi
+  if [ -x /opt/leigod/leigod_cleanup_net.sh ]; then
+    /opt/leigod/leigod_cleanup_net.sh 2>/dev/null || true
+  fi
+  if [ -r /var/lib/leigod/device-mac ] && command -v ip >/dev/null 2>&1 \
+      && ip -d link show wlan0 2>/dev/null | grep -qw dummy; then
+    expected=$(tr 'A-F' 'a-f' < /var/lib/leigod/device-mac | tr -d ' \t\r\n')
+    actual=$(cat /sys/class/net/wlan0/address 2>/dev/null || true)
+    if [ -n "$expected" ] && [ "$actual" = "$expected" ]; then
+      ip link delete wlan0 2>/dev/null || true
+    fi
+  fi
+}
+
+post_remove() {
+  if [ -L /home/leigod ] && [ "$(readlink /home/leigod)" = "/opt/leigod" ]; then
+    rm -f /home/leigod
+  fi
+  rm -rf /run/leigod /opt/leigod/webui
+}
