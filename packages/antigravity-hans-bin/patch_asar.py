@@ -1,28 +1,24 @@
 #!/usr/bin/env python3
-"""
-Injects Antigravity-Hans Chinese localization overlay into Electron's app.asar
-without external Node/asar dependencies.
+"""Inject Antigravity-Hans localization overlay into Electron app.asar without external Node tooling."""
 
-Patches:
-- dist/preload.js (all main Antigravity Hub BrowserWindows)
-- dist/ideInstall/wizardPreload.js (IDE install wizard BrowserWindow)
-- dist/main.js (data:text/html splash windows without a preload script)
-"""
+from __future__ import annotations
+
 import hashlib
 import json
+from pathlib import Path
 import struct
 import sys
-from pathlib import Path
 
 MARKER = "/* ANTIGRAVITY_HANS_OVERLAY_INJECTED */"
 BLOCK_SIZE = 4 * 1024 * 1024  # 4 MiB Electron ASAR integrity block size
+PRELOAD_TARGETS = ("dist/preload.js", "dist/ideInstall/wizardPreload.js")
+MAIN_ANCHOR = "electron_1.app.on('web-contents-created', (_event, contents) => {"
 
 
-def calc_integrity(data: bytes) -> dict:
-    blocks = [
-        hashlib.sha256(data[i : i + BLOCK_SIZE]).hexdigest()
-        for i in range(0, len(data), BLOCK_SIZE)
-    ] or [hashlib.sha256(b"").hexdigest()]
+def calc_integrity(data: bytes) -> dict[str, object]:
+    blocks = [hashlib.sha256(data[i : i + BLOCK_SIZE]).hexdigest() for i in range(0, len(data), BLOCK_SIZE)] or [
+        hashlib.sha256(b"").hexdigest()
+    ]
     return {
         "algorithm": "SHA256",
         "hash": hashlib.sha256(data).hexdigest(),
@@ -31,73 +27,68 @@ def calc_integrity(data: bytes) -> dict:
     }
 
 
-def get_node(tree: dict, rel_path: str) -> dict | None:
-    node = tree
+def get_node(tree: dict[str, object], rel_path: str) -> dict[str, object] | None:
+    node: object = tree
     for part in rel_path.split("/"):
-        node = node.get("files", {}).get(part)
-        if node is None:
+        if not isinstance(node, dict):
             return None
-    return node
+        files = node.get("files")
+        node = files.get(part) if isinstance(files, dict) else None
+    return node if isinstance(node, dict) else None
+
+
+def read_asar(asar_path: Path) -> tuple[dict[str, object], bytearray]:
+    with asar_path.open("rb") as f:
+        prefix = f.read(16)
+        if len(prefix) < 16:
+            raise ValueError(f"{asar_path} is not a valid ASAR archive")
+        u0, header_size, _, json_len = struct.unpack("<4I", prefix)
+        if u0 != 4:
+            raise ValueError(f"unexpected ASAR pickle header u0={u0}")
+        tree = json.loads(f.read(json_len).decode("utf-8"))
+        f.seek(8 + header_size)
+        payload = bytearray(f.read())
+    return tree, payload
 
 
 def patch_asar(asar_path: Path, overlay_path: Path) -> None:
-    overlay_js = overlay_path.read_text(encoding="utf-8")
-    if not overlay_js.strip():
-        raise ValueError(f"Overlay script {overlay_path} is empty")
+    overlay_js = overlay_path.read_text(encoding="utf-8").strip()
+    if not overlay_js:
+        raise ValueError(f"overlay script {overlay_path} is empty")
 
-    raw_asar = asar_path.read_bytes()
-    if len(raw_asar) < 16:
-        raise ValueError(f"{asar_path} is not a valid ASAR archive")
+    tree, payload = read_asar(asar_path)
 
-    u0, header_size, u2, json_len = struct.unpack("<IIII", raw_asar[:16])
-    if u0 != 4:
-        raise ValueError(f"Unexpected ASAR pickle header u0={u0}")
+    def read_entry(node: dict[str, object]) -> str:
+        off, size = int(str(node["offset"])), int(str(node["size"]))
+        return bytes(payload[off : off + size]).decode("utf-8")
 
-    payload_offset = 8 + header_size
-    header_json = raw_asar[16 : 16 + json_len].decode("utf-8")
-    tree = json.loads(header_json)
-    payload = bytearray(raw_asar[payload_offset:])
+    def write_entry(node: dict[str, object], content: str) -> None:
+        encoded = content.encode("utf-8")
+        node["offset"] = str(len(payload))
+        node["size"] = len(encoded)
+        node["integrity"] = calc_integrity(encoded)
+        payload.extend(encoded)
 
-    def read_asar_file(node: dict) -> bytes:
-        off = int(node["offset"])
-        size = int(node["size"])
-        return bytes(payload[off : off + size])
-
-    def update_asar_file(node: dict, new_bytes: bytes) -> None:
-        new_off = len(payload)
-        payload.extend(new_bytes)
-        node["offset"] = str(new_off)
-        node["size"] = len(new_bytes)
-        node["integrity"] = calc_integrity(new_bytes)
-
-    patched_targets = []
-
-    # 1. Inject overlay into preload scripts (runs before DOMContentLoaded in renderer)
-    for preload_rel in ("dist/preload.js", "dist/ideInstall/wizardPreload.js"):
-        node = get_node(tree, preload_rel)
+    patched_targets: set[str] = set()
+    for rel_path in PRELOAD_TARGETS:
+        node = get_node(tree, rel_path)
         if node is None or "files" in node:
             continue
-        source = read_asar_file(node).decode("utf-8")
-        if MARKER in source:
-            print(f"• {preload_rel} already contains localization overlay")
-            patched_targets.append(preload_rel)
-            continue
-        patched = f"{source.rstrip()}\n\n{MARKER}\n;{overlay_js.strip()}\n"
-        update_asar_file(node, patched.encode("utf-8"))
-        patched_targets.append(preload_rel)
-        print(f"✓ Injected localization overlay into {preload_rel}")
+        source = read_entry(node)
+        if MARKER not in source:
+            write_entry(node, f"{source.rstrip()}\n\n{MARKER}\n;{overlay_js}\n")
+            print(f"  Injected localization overlay into {rel_path}")
+        patched_targets.add(rel_path)
 
     if "dist/preload.js" not in patched_targets:
-        raise RuntimeError("Critical target dist/preload.js not found in app.asar")
+        raise RuntimeError("critical target dist/preload.js not found in app.asar")
 
-    # 2. Inject fallback into dist/main.js for data:text/html splash windows without preload
     main_node = get_node(tree, "dist/main.js")
     if main_node is not None and "files" not in main_node:
-        main_src = read_asar_file(main_node).decode("utf-8")
-        anchor = "electron_1.app.on('web-contents-created', (_event, contents) => {"
-        if MARKER not in main_src and anchor in main_src:
+        main_src = read_entry(main_node)
+        if MARKER not in main_src and MAIN_ANCHOR in main_src:
             splash_hook = (
-                f"{anchor}\n"
+                f"{MAIN_ANCHOR}\n"
                 f"    {MARKER}\n"
                 f"    if (contents.getType() === 'window') {{\n"
                 f"        contents.on('dom-ready', () => {{\n"
@@ -107,32 +98,28 @@ def patch_asar(asar_path: Path, overlay_path: Path) -> None:
                 f"        }});\n"
                 f"    }}"
             )
-            main_src = main_src.replace(anchor, splash_hook, 1)
-            update_asar_file(main_node, main_src.encode("utf-8"))
-            print("✓ Injected splash window localization hook into dist/main.js")
+            write_entry(main_node, main_src.replace(MAIN_ANCHOR, splash_hook, 1))
+            print("  Injected splash window localization hook into dist/main.js")
 
-    new_json_bytes = json.dumps(tree, separators=(",", ":")).encode("utf-8")
-    new_json_len = len(new_json_bytes)
-    aligned_json_len = (new_json_len + 3) & ~3
-    padding = b"\x00" * (aligned_json_len - new_json_len)
-    new_u2 = 4 + aligned_json_len
-    new_header_size = 4 + new_u2
-    new_header = struct.pack("<IIII", 4, new_header_size, new_u2, new_json_len)
+    json_bytes = json.dumps(tree, separators=(",", ":")).encode("utf-8")
+    aligned_len = (len(json_bytes) + 3) & ~3
+    padding = b"\x00" * (aligned_len - len(json_bytes))
+    header = struct.pack("<4I", 4, 8 + aligned_len, 4 + aligned_len, len(json_bytes))
 
-    tmp_path = asar_path.with_suffix(".asar.tmp")
-    with open(tmp_path, "wb") as f:
-        f.write(new_header)
-        f.write(new_json_bytes)
+    tmp = asar_path.with_suffix(".asar.tmp")
+    with tmp.open("wb") as f:
+        f.write(header)
+        f.write(json_bytes)
         f.write(padding)
         f.write(payload)
-    tmp_path.chmod(asar_path.stat().st_mode)
-    tmp_path.replace(asar_path)
-    print(f"✓ Successfully repacked {asar_path}")
+    tmp.chmod(asar_path.stat().st_mode)
+    tmp.replace(asar_path)
+    print(f"  Repacked {asar_path}")
 
 
 def main() -> None:
     if len(sys.argv) != 3:
-        print(f"Usage: {sys.argv[0]} <path/to/app.asar> <path/to/antigravity-hans-overlay.js>", file=sys.stderr)
+        print(f"Usage: {sys.argv[0]} <path/to/app.asar> <path/to/overlay.js>", file=sys.stderr)
         sys.exit(1)
     patch_asar(Path(sys.argv[1]), Path(sys.argv[2]))
 
