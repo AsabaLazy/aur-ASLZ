@@ -1,10 +1,10 @@
 # Maintainer: AsabaLazy <https://github.com/AsabaLazy/aur-ASLZ>
 pkgname=leinux-bin
 epoch=1
-pkgver=0.2.2
+pkgver=0.2.21
 pkgrel=1
 _corever=1.3.0.02
-_commit=7d8cf4e148d346246735c1e1bfd72a3bc9dad0d2
+_commit=9e709837d9bce9d05b37c090b683cf36173fe10b
 _version_ini="Cargo.toml"
 pkgdesc="Leinux — Native GTK4 GUI, CLI & routing daemon for Leigod Accelerator on Linux"
 arch=('x86_64')
@@ -28,7 +28,7 @@ source_x86_64=(
   "ipdatacloud_country.xdb-${_corever}::http://119.3.40.126/ipdatacloud_country.xdb"
 )
 sha256sums_x86_64=(
-  '6b62eb6717457beaaa2c2397a8035f1856d0eb91c10fe015dc484f4f37009fa5'
+  'c1c8fd1338ddc47399ec9156a3d24b9c323a7a8e7e147b54f83421ed404c3065'
   '3640d47abaee4a6b4312e3489137311ab309d27dcb92ab640c0fe3d953328c1b'
   '3536000ee9eb3997538cb37a14f90d571979734c48b23b8d548eceac16666273'
 )
