@@ -1,10 +1,10 @@
 # Maintainer: AsabaLazy
 
 pkgname=antigravity-bin
-pkgver=2.31.0
+pkgver=2.34.0
 pkgrel=1
 # execution_id from the official /releases feed
-_build=6379060755038208
+_build=5887025308631040
 _feed_url='https://antigravity-hub-auto-updater-974169037036.us-central1.run.app/releases'
 _manifest_url='https://antigravity-hub-auto-updater-974169037036.us-central1.run.app/manifest/latest-x64-linux.yml'
 pkgdesc='Google Antigravity agentic development platform (prebuilt desktop client)'
@@ -39,10 +39,10 @@ depends=('alsa-lib'
 options=('!debug' '!strip')
 source=('antigravity.desktop'
         'antigravity.png')
-source_x86_64=("${pkgname}-${pkgver}.tar.gz::https://storage.googleapis.com/antigravity-public/antigravity-hub/2.31.0-6379060755038208/linux-x64/Antigravity.tar.gz")
+source_x86_64=("${pkgname}-${pkgver}.tar.gz::https://storage.googleapis.com/antigravity-public/antigravity-hub/2.34.0-5887025308631040/linux-x64/Antigravity.tar.gz")
 sha256sums=('b73a53109cd82c5c16fdf042a2203b2d46cd535a97442afd3c39cb506e1bf569'
             'b27f0e4a6f14f491ba31bb24533a1f43c677362b12a0744a53fdd09d7c785317')
-sha256sums_x86_64=('30ccdea1fff0bf643b7f6e7aa493240d13ec1d866acf4f89c2a6cc3a2c33369c')
+sha256sums_x86_64=('478c68f86c9ef61a502185a39e9ceec66b1276a6a53b191a19b0d9ce869836db')
 
 package() {
   install -d "${pkgdir}/opt"
