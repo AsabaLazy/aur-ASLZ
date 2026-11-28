@@ -1,6 +1,6 @@
 # Maintainer: Shanghai Fazhi Technology Co., Ltd <support@dimagent.cn>
 pkgname=dimagent-bin
-pkgver=0.9.62
+pkgver=0.9.71
 pkgrel=1
 _manifest_url="https://dimcode.echooai.com/updates/stable/linux/x64/latest-linux.yml"
 pkgdesc="DimAgent desktop client — AI coding agent"
@@ -12,8 +12,8 @@ optdepends=('libappindicator-gtk3: tray icon on desktops without StatusNotifier'
 provides=('dimagent')
 conflicts=('dimagent')
 options=('!debug' '!strip')
-source_x86_64=("${pkgname}-${pkgver}.deb::https://dimcode.echooai.com/updates/stable/linux/x64/DimAgent-0.9.62.deb")
-sha256sums_x86_64=('20d3042fc1d3cc19c885b1a963f932f689e2d94e09dd01839cef636678dacb2b')
+source_x86_64=("${pkgname}-${pkgver}.deb::https://dimcode.echooai.com/updates/stable/linux/x64/DimAgent-0.9.71.deb")
+sha256sums_x86_64=('3fb42f86976c9b977f63276a64d80dc1395bb10ab467e8e30ab8a63d922797d6')
 
 package() {
   bsdtar -xf data.tar.* -C "${pkgdir}"

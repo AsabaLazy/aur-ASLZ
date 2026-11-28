@@ -1,6 +1,6 @@
 # Maintainer: GopeedLab <https://github.com/GopeedLab/gopeed>
 pkgname=gopeed-bin
-pkgver=1.9.3
+pkgver=2.0.0
 pkgrel=1
 pkgdesc="High speed downloader that supports all platforms (official prebuilt binary)"
 arch=('x86_64')
@@ -10,8 +10,8 @@ depends=('gtk3' 'libdbusmenu-glib' 'libayatana-appindicator' 'libayatana-indicat
 provides=('gopeed')
 conflicts=('gopeed')
 options=('!debug' '!strip')
-source_x86_64=("gopeed-${pkgver}.deb::https://github.com/GopeedLab/gopeed/releases/download/v1.9.3/Gopeed-v1.9.3-linux-amd64.deb")
-sha256sums_x86_64=('23d7caa11877ad0a21d6f1a8f1e00e23606ccf9fe2953a3d045046a2950946e5')
+source_x86_64=("gopeed-${pkgver}.deb::https://github.com/GopeedLab/gopeed/releases/download/v2.0.0/Gopeed-v2.0.0-linux-amd64.deb")
+sha256sums_x86_64=('7cead8afab4f9ce1ce17502f8336540c80e21e9ff2bc0cd4a40bf2b3a13d15d1')
 
 package() {
   bsdtar -xf data.tar.* -C "${pkgdir}"
